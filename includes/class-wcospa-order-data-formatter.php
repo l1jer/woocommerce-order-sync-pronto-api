@@ -13,7 +13,8 @@ class WCOSPA_Order_Data_Formatter {
 
         return [
             'customer_reference' => 'ZTAU' . $order->get_id(),
-            'debtor' => '210942',
+            'debtor' => '210942', // Updated debtor code
+            'status_code' => self::get_status_code($order->get_status()), // Determine status_code based on order status
             'delivery_address' => [
                 'address1' => $shipping_address['address_1'],
                 'address2' => $shipping_address['address_2'],
@@ -31,6 +32,21 @@ class WCOSPA_Order_Data_Formatter {
             ],
             'lines' => self::format_order_items($order->get_items())
         ];
+    }
+
+    /**
+     * Determine the status code based on the WooCommerce order status.
+     *
+     * @param string $status The WooCommerce order status.
+     * @return int The corresponding status code for the API.
+     */
+    private static function get_status_code($status) {
+        $status_codes = [
+            'processing' => 30,
+            'completed' => 80
+        ];
+
+        return $status_codes[$status] ?? 0; // Return 0 or a default value if status is not matched
     }
 
     private static function convert_payment_method($method) {
