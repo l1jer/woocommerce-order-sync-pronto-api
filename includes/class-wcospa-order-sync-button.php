@@ -14,12 +14,18 @@ class WCOSPA_Order_Sync_Button {
     }
 
     public static function add_sync_button($order) {
+        $status = $order->get_status();
+        $disabled = ($status === 'on-hold' || $status === 'cancelled') ? 'disabled' : '';
+        $tooltip = ($status === 'on-hold' || $status === 'cancelled') ? 'title="' . esc_attr__('Unable to sync Cancelled and On-hold orders', 'wcospa') . '"' : '';
+        $button_class = ($disabled) ? 'wcospa-disabled-button' : 'sync-order-button';
+
         wp_nonce_field('wcospa_sync_order', 'wcospa_sync_nonce');
-        echo '<button class="button wc-action-button wc-action-button-sync sync-order-button" data-order-id="' . $order->get_id() . '" title="' . esc_attr__('Sync to API', 'wcospa') . '">Sync</button>';
+        echo '<button class="button wc-action-button wc-action-button-sync ' . esc_attr($button_class) . '" data-order-id="' . esc_attr($order->get_id()) . '" ' . esc_attr($disabled) . ' ' . esc_attr($tooltip) . '>' . esc_html__('Sync', 'wcospa') . '</button>';
     }
 
     public static function enqueue_sync_button_script() {
         wp_enqueue_script('wcospa-sync-button', WCOSPA_URL . 'assets/js/wcospa-sync-button.js', ['jquery'], WCOSPA_VERSION, true);
+        wp_add_inline_style('wcospa-sync-button', self::get_button_css());
     }
 
     public static function handle_ajax_sync() {
@@ -37,5 +43,19 @@ class WCOSPA_Order_Sync_Button {
         }
 
         wp_send_json_success('Order synced successfully.');
+    }
+
+    private static function get_button_css() {
+        return "
+            .wcospa-disabled-button {
+                background-color: #ccc !important;
+                color: #999 !important;
+                cursor: not-allowed !important;
+                pointer-events: none;
+            }
+            .wcospa-disabled-button:hover {
+                cursor: not-allowed;
+            }
+        ";
     }
 }
