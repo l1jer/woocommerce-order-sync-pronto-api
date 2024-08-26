@@ -2,7 +2,7 @@ jQuery(document).ready(function ($) {
     $('.sync-order-button').click(function () {
         var button = $(this);
         var orderId = button.data('order-id');
-        var nonce = $('#wcospa_sync_nonce').val();
+        var nonce = button.data('nonce');
 
         if (button.hasClass('disabled')) {
             return; // Prevent action if button is disabled
