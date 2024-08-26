@@ -36,10 +36,11 @@ class WCOSPA_Order_Sync_Button {
         $disabled_class = $disabled ? 'disabled' : '';
         $disabled_attr = $disabled ? 'disabled="disabled"' : '';
 
-        echo '<button class="button wc-action-button wc-action-button-sync sync-order-button ' . $disabled_class . '"
+        echo '<button class="button wc-action-button wc-action-button-sync sync-order-button ' . esc_attr($disabled_class) . '"
                   data-order-id="' . esc_attr($order_id) . '"
+                  data-nonce="' . esc_attr(wp_create_nonce('wcospa_sync_order_nonce')) . '"
                   title="' . esc_attr($tooltip) . '"
-                  ' . $disabled_attr . '>' . esc_html($button_text) . '</button>';
+                  ' . esc_attr($disabled_attr) . '>' . esc_html($button_text) . '</button>';
     }
 
     public static function enqueue_sync_button_script() {
@@ -47,7 +48,7 @@ class WCOSPA_Order_Sync_Button {
     }
 
     public static function handle_ajax_sync() {
-        check_ajax_referer('wcospa_sync_order', 'security');
+        check_ajax_referer('wcospa_sync_order_nonce', 'security');
 
         if (!isset($_POST['order_id'])) {
             wp_send_json_error('Missing order ID');
