@@ -13,7 +13,7 @@ class WCOSPA_Order_Data_Formatter {
 
         return [
             'customer_reference' => 'ZTAU' . $order->get_id(),
-            'debtor' => '210671',
+            'debtor' => '210942',
             'delivery_address' => [
                 'address1' => $shipping_address['address_1'],
                 'address2' => $shipping_address['address_2'],
