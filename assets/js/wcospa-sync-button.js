@@ -1,12 +1,12 @@
 jQuery(document).ready(function ($) {
     $('.sync-order-button').click(function () {
         var button = $(this);
-        if (button.hasClass('wcospa-disabled-button')) {
-            return; // Prevent click action if the button is disabled
-        }
-
         var orderId = button.data('order-id');
         var nonce = $('#wcospa_sync_nonce').val();
+
+        if (button.hasClass('disabled')) {
+            return; // Prevent action if button is disabled
+        }
 
         button.html('Syncing...').prop('disabled', true);
 
@@ -20,10 +20,10 @@ jQuery(document).ready(function ($) {
             },
             success: function (response) {
                 if (response.success) {
-                    button.html('Synced').prop('disabled', false);
+                    button.html('Already Synced').addClass('disabled').attr('title', 'Already Synced');
                     console.log('Sync successful: ', response);
                 } else {
-                    button.html('Failed: ' + response.data).prop('disabled', false);
+                    button.html('Retry Sync').prop('disabled', false);
                     console.log('Sync failed: ', response.data);
                 }
             },
@@ -32,5 +32,18 @@ jQuery(document).ready(function ($) {
                 console.error('Sync error: ', error);
             }
         });
+    });
+
+    // Initialize tooltips
+    $('.sync-order-button').hover(function () {
+        var tooltip = $(this).attr('title');
+        if (tooltip) {
+            $(this).attr('data-tooltip', tooltip).removeAttr('title');
+        }
+    }, function () {
+        var tooltip = $(this).attr('data-tooltip');
+        if (tooltip) {
+            $(this).attr('title', tooltip).removeAttr('data-tooltip');
+        }
     });
 });
