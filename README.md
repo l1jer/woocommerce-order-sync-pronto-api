@@ -28,15 +28,20 @@ The WooCommerce Order Sync Pronto API plugin automatically syncs WooCommerce ord
 3. Configure your API credentials in the `wcospa-credentials.php` file located in `includes/`.
 
 == Changelog ==
-= 1.3.1 =
 
+= 1.3.2 =
+- **Feature:** Added a new "Clear All Sync Data" button to the Sync Status page.
+  - Clicking this button will reset the sync status for all orders, allowing them to be re-synced.
+  - All related metadata such as the transaction UUID, Pronto Order number, and sync status will be cleared.
+- **Improvement:** General code refactoring and enhancements for better performance and usability.
+
+= 1.3.1 =
 - **Enhancement:** Updated the "Pronto Order No." column to display `"-"` when no data is available and `"Pending"` only if the sync is in progress.
 - **Enhancement:** The sync button now immediately changes to `"Already Synced"` once the sync process starts, instead of showing `"Pending"`.
 - **Enhancement:** Updated the `customer_reference` in the API request to be formatted as `"order number / shipping last name"`.
 - **Improvement:** General code refactoring for better performance and readability.
 
 = 1.3.0
-
 - **Feature:** Added a cron job to automatically check the status of synced orders every minute for up to 10 minutes.
 - **Feature:** New column "Pronto Order No." added to the WooCommerce Orders admin page, displaying the Pronto Order number once retrieved.
 - **Enhancement:** The sync button now shows "Pending" after syncing and stores the transaction UUID with the order.
@@ -45,13 +50,11 @@ The WooCommerce Order Sync Pronto API plugin automatically syncs WooCommerce ord
 - **Enhancement:** Added robust error handling and logging throughout the sync process.
 
 = 1.2.1 =
-
 - **Bug Fix:** Resolved a `403 Forbidden` error when clicking the "Sync" button due to incorrect nonce verification.
 - **Enhancement:** Improved nonce handling for AJAX requests to prevent unauthorized access errors.
 - **Enhancement:** Added visual feedback for successful sync operations in the WooCommerce admin order actions.
 
 = 1.2.0 =
-
 - **Feature:** Added a "Sync Status" page under the WooCommerce menu.
   - Displays all sync logs, including order details, sync date/time, and Pronto Order number.
   - Includes a "Clear Sync Records" button to delete all sync logs with a confirmation prompt.
@@ -59,7 +62,6 @@ The WooCommerce Order Sync Pronto API plugin automatically syncs WooCommerce ord
 - **Enhancement:** Improved the logging system to store sync events, including transaction UUID and Pronto Order number.
 
 = 1.1.0 =
-
 - **Feature:** Updated the sync button in WooCommerce admin:
   - The button is disabled and greyed out for orders that are not in "processing" or "completed" status.
   - Added a tooltip "Unable to sync Cancelled and On-hold orders" when hovering over the disabled button.
