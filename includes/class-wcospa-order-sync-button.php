@@ -17,16 +17,22 @@ class WCOSPA_Order_Sync_Button {
         $order_id = $order->get_id();
         $order_status = $order->get_status();
         $already_synced = get_post_meta($order_id, '_wcospa_already_synced', true);
+        $transaction_uuid = get_post_meta($order_id, '_wcospa_transaction_uuid', true);
+        $pronto_order_number = get_post_meta($order_id, '_wcospa_pronto_order_number', true);
 
         // Determine button state and tooltip
         $disabled = false;
         $tooltip = '';
         $button_text = 'Sync';
 
-        if ($already_synced) {
+        if ($already_synced && $pronto_order_number) {
             $disabled = true;
             $tooltip = __('Already Synced', 'wcospa');
             $button_text = __('Already Synced', 'wcospa');
+        } elseif ($transaction_uuid) {
+            $disabled = true;
+            $tooltip = __('Pending', 'wcospa');
+            $button_text = __('Pending', 'wcospa');
         } elseif (!in_array($order_status, ['processing', 'completed'])) {
             $disabled = true;
             $tooltip = __('Unable to sync Cancelled and On-hold orders', 'wcospa');
@@ -61,15 +67,20 @@ class WCOSPA_Order_Sync_Button {
             wp_send_json_error('This order has already been synced.');
         }
 
-        $response = WCOSPA_API_Client::send_order($order_id);
+        // Sync the order and get the transaction UUID
+        $uuid = WCOSPA_API_Client::send_order($order_id);
 
-        if (is_wp_error($response)) {
-            wp_send_json_error($response->get_error_message());
+        if (is_wp_error($uuid)) {
+            wp_send_json_error($uuid->get_error_message());
         }
 
-        // Mark order as synced
-        update_post_meta($order_id, '_wcospa_already_synced', true);
+        // Store the UUID with the order
+        update_post_meta($order_id, '_wcospa_transaction_uuid', $uuid);
 
-        wp_send_json_success('Order synced successfully.');
+        // Schedule the custom cron event to start checking order status
+        WCOSPA_Cron::schedule_event();
+
+        // Mark the order as pending and return success
+        wp_send_json_success('Order synced successfully. Transaction UUID: ' . $uuid);
     }
 }

@@ -26,6 +26,7 @@ class WCOSPA_API_Client {
         ]);
 
         if (is_wp_error($response)) {
+            error_log('API request failed: ' . $response->get_error_message());
             return $response;
         }
 
@@ -33,9 +34,16 @@ class WCOSPA_API_Client {
         $response_body = wp_remote_retrieve_body($response);
 
         if ($response_code !== 200) {
-            return new WP_Error('api_error', "API request error: HTTP {$response_code} - {$response_body}");
+            return new WP_Error('api_error', "API request error: HTTP {$response_code}");
         }
 
-        return true;
+        // Attempt to extract the UUID from the response body
+        $response_data = json_decode($response_body, true);
+        if (isset($response_data['apitransactions'][0]['uuid'])) {
+            return $response_data['apitransactions'][0]['uuid']; // Return UUID
+        } else {
+            error_log('Failed to extract UUID from response body.');
+            return new WP_Error('uuid_error', 'Failed to extract UUID from API response.');
+        }
     }
 }
