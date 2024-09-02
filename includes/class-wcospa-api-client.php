@@ -13,7 +13,10 @@ class WCOSPA_API_Client {
             return new WP_Error('order_not_found', 'Order not found: ' . $order_id);
         }
 
-        $order_data = WCOSPA_Order_Data_Formatter::format_order($order);
+        // Format customer_reference as "order number / shipping last name"
+        $customer_reference = $order->get_id() . ' / ' . strtoupper($order->get_shipping_last_name());
+
+        $order_data = WCOSPA_Order_Data_Formatter::format_order($order, $customer_reference);
         $credentials = WCOSPA_Credentials::get_api_credentials();
 
         $response = wp_remote_post($credentials['api_url'], [

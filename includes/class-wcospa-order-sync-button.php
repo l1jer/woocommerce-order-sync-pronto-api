@@ -17,7 +17,6 @@ class WCOSPA_Order_Sync_Button {
         $order_id = $order->get_id();
         $order_status = $order->get_status();
         $already_synced = get_post_meta($order_id, '_wcospa_already_synced', true);
-        $transaction_uuid = get_post_meta($order_id, '_wcospa_transaction_uuid', true);
         $pronto_order_number = get_post_meta($order_id, '_wcospa_pronto_order_number', true);
 
         // Determine button state and tooltip
@@ -25,14 +24,10 @@ class WCOSPA_Order_Sync_Button {
         $tooltip = '';
         $button_text = 'Sync';
 
-        if ($already_synced && $pronto_order_number) {
+        if ($already_synced || $pronto_order_number) {
             $disabled = true;
             $tooltip = __('Already Synced', 'wcospa');
             $button_text = __('Already Synced', 'wcospa');
-        } elseif ($transaction_uuid) {
-            $disabled = true;
-            $tooltip = __('Pending', 'wcospa');
-            $button_text = __('Pending', 'wcospa');
         } elseif (!in_array($order_status, ['processing', 'completed'])) {
             $disabled = true;
             $tooltip = __('Unable to sync Cancelled and On-hold orders', 'wcospa');
@@ -80,7 +75,9 @@ class WCOSPA_Order_Sync_Button {
         // Schedule the custom cron event to start checking order status
         WCOSPA_Cron::schedule_event();
 
-        // Mark the order as pending and return success
+        // Mark the order as already synced and return success
+        update_post_meta($order_id, '_wcospa_already_synced', true);
+
         wp_send_json_success('Order synced successfully. Transaction UUID: ' . $uuid);
     }
 }

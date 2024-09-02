@@ -28,8 +28,14 @@ The WooCommerce Order Sync Pronto API plugin automatically syncs WooCommerce ord
 3. Configure your API credentials in the `wcospa-credentials.php` file located in `includes/`.
 
 == Changelog ==
+= 1.3.1 =
 
-= 1.3.0 =
+- **Enhancement:** Updated the "Pronto Order No." column to display `"-"` when no data is available and `"Pending"` only if the sync is in progress.
+- **Enhancement:** The sync button now immediately changes to `"Already Synced"` once the sync process starts, instead of showing `"Pending"`.
+- **Enhancement:** Updated the `customer_reference` in the API request to be formatted as `"order number / shipping last name"`.
+- **Improvement:** General code refactoring for better performance and readability.
+
+= 1.3.0
 
 - **Feature:** Added a cron job to automatically check the status of synced orders every minute for up to 10 minutes.
 - **Feature:** New column "Pronto Order No." added to the WooCommerce Orders admin page, displaying the Pronto Order number once retrieved.
