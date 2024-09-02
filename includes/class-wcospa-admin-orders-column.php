@@ -28,10 +28,14 @@ class WCOSPA_Admin_Orders_Column {
     public static function display_pronto_order_column($column, $post_id) {
         if ($column === 'pronto_order_number') {
             $pronto_order_number = get_post_meta($post_id, '_wcospa_pronto_order_number', true);
+            $transaction_uuid = get_post_meta($post_id, '_wcospa_transaction_uuid', true);
+
             if ($pronto_order_number) {
                 echo esc_html($pronto_order_number);
+            } elseif ($transaction_uuid) {
+                echo __('Pending', 'wcospa');
             } else {
-                echo '<span class="dashicons dashicons-clock"></span> ' . __('Pending', 'wcospa');
+                echo '-';
             }
         }
     }
