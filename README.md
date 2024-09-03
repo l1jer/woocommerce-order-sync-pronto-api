@@ -3,7 +3,7 @@ Contributors: Jerry Li
 Tags: woocommerce, order sync, API, pronto
 Requires at least: 5.0
 Tested up to: 6.5.3
-Stable tag: 1.3.0
+Stable tag: 1.3.2.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -29,6 +29,16 @@ The WooCommerce Order Sync Pronto API plugin automatically syncs WooCommerce ord
 
 == Changelog ==
 
+= 1.3.2.1 =
+- **Feature:** Updated delivery instructions handling:
+  - `del_inst_1` now includes "NO INVOICE & PACKING SLIP" in uppercase.
+  - `del_inst_2` adds the customer email from shipping if different from the billing email.
+  - `del_inst_3` includes the first 30 characters of the Order Notes, if available.
+- **Feature:** Pronto Order No. field now displays `"-"` until the Sync button is clicked, and `"Pending"` after the button is clicked until the Pronto order number is fetched.
+- **Enhancement:** Sync button now displays `"Syncing..."` while the sync is in progress and updates the Pronto Order No. field accordingly.
+- **Improvement:** General code refactoring and enhancements for better performance and usability.
+- **Improvement:** The Sync button's JavaScript has been rewritten using plain JavaScript (Vanilla JS) instead of jQuery.
+
 = 1.3.2 =
 - **Feature:** Added a new "Clear All Sync Data" button to the Sync Status page.
   - Clicking this button will reset the sync status for all orders, allowing them to be re-synced.
@@ -41,7 +51,7 @@ The WooCommerce Order Sync Pronto API plugin automatically syncs WooCommerce ord
 - **Enhancement:** Updated the `customer_reference` in the API request to be formatted as `"order number / shipping last name"`.
 - **Improvement:** General code refactoring for better performance and readability.
 
-= 1.3.0
+= 1.3.0 =
 - **Feature:** Added a cron job to automatically check the status of synced orders every minute for up to 10 minutes.
 - **Feature:** New column "Pronto Order No." added to the WooCommerce Orders admin page, displaying the Pronto Order number once retrieved.
 - **Enhancement:** The sync button now shows "Pending" after syncing and stores the transaction UUID with the order.
@@ -90,6 +100,9 @@ Once an order is synced, the "Sync" button will be disabled and display "Already
 
 = What does the "Clear Sync Records" button do? =
 The "Clear Sync Records" button on the Sync Status page will permanently delete all sync logs. This action cannot be undone.
+
+= What does the "Clear All Sync Data" button do? =
+The "Clear All Sync Data" button on the Sync Status page will reset the sync status for all orders. This includes clearing the transaction UUID, Pronto Order number, and sync status, allowing you to re-sync all orders.
 
 = How does the plugin handle pending orders? =
 If the transaction status is "Pending", the plugin will automatically check the status every minute for up to 10 minutes. Once the status changes to "Complete", the Pronto Order number will be retrieved and displayed.
@@ -142,12 +155,12 @@ This is the plugin code, please review, analyse and update the code to meet the 
                 "del_inst_1": "No invoice&packing slip",
                 "del_inst_2": "franzwa@brisbanewestre.com",
                 "del_inst_3": "",
-5a. add uppercase "No invoice & packing slip" to del_inst_1
-5b. Add customer email from shipping (if different to billing email) to del_inst_2
-5c. if there is any Order Notes, add this to "delivery_instructions" -> "del_inst_3", limit to 30 characters only; if nothing in Order Notes, then leave it empty
-1. remove price_ex_tax
-2. need a calculation each product price from woocommerce need to divided by 1.1, this is the price needs to send to API
-3. in the following part:
+6a. add uppercase "No invoice & packing slip" to del_inst_1
+6b. Add customer email from shipping (if different to billing email) to del_inst_2
+6c. if there is any Order Notes, add this to "delivery_instructions" -> "del_inst_3", limit to 30 characters only; if nothing in Order Notes, then leave it empty **DONE**
+7. remove price_ex_tax
+8. need a calculation each product price from woocommerce need to divided by 1.1, this is the price needs to send to API
+9. in the following part:
        'delivery_address' => [
             'address1' => $shipping_address['address_1'],
             'address2' => $shipping_address['address_2'],
@@ -160,3 +173,4 @@ then
 address1 should go with customer first name and last name, capitalised
 address2 is $shipping_address['address_1']
 address3 is $shipping_address['address_2']
+10. Add a CHECK button next to Sync to check the Pronto Order number, only activated when SYNC button clicked after 2 mins,
