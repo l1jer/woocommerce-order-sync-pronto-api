@@ -1,49 +1,42 @@
-jQuery(document).ready(function ($) {
-    $('.sync-order-button').click(function () {
-        var button = $(this);
-        var orderId = button.data('order-id');
-        var nonce = button.data('nonce');
+document.addEventListener('DOMContentLoaded', function () {
+    var syncButtons = document.querySelectorAll('.sync-order-button');
 
-        if (button.hasClass('disabled')) {
-            return; // Prevent action if button is disabled
-        }
+    syncButtons.forEach(function (button) {
+        button.addEventListener('click', function () {
+            var orderId = button.getAttribute('data-order-id');
+            var nonce = button.getAttribute('data-nonce');
+            var prontoOrderField = document.querySelector('#post-' + orderId + ' .column-pronto_order_number');
 
-        button.html('Syncing...').prop('disabled', true);
+            button.textContent = 'Syncing...';
+            button.disabled = true;
 
-        $.ajax({
-            url: ajaxurl,
-            type: 'POST',
-            data: {
-                action: 'wcospa_sync_order',
-                order_id: orderId,
-                security: nonce
-            },
-            success: function (response) {
-                if (response.success) {
-                    button.html('Already Synced').addClass('disabled').attr('title', 'Already Synced');
-                    console.log('Sync successful: ', response);
+            prontoOrderField.textContent = 'Pending';
+
+            var xhr = new XMLHttpRequest();
+            xhr.open('POST', ajaxurl, true);
+            xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+            xhr.onload = function () {
+                if (xhr.status === 200) {
+                    var response = JSON.parse(xhr.responseText);
+                    if (response.success) {
+                        button.textContent = 'Already Synced';
+                        console.log('Sync successful: ', response);
+                    } else {
+                        button.textContent = 'Failed: ' + response.data;
+                        button.disabled = false;
+                        prontoOrderField.textContent = '-';
+                        console.log('Sync failed: ', response.data);
+                    }
                 } else {
-                    button.html('Retry Sync').prop('disabled', false);
-                    console.log('Sync failed: ', response.data);
+                    button.textContent = 'Retry Sync';
+                    button.disabled = false;
+                    prontoOrderField.textContent = '-';
+                    console.error('Sync error: ', xhr.statusText);
                 }
-            },
-            error: function (xhr, status, error) {
-                button.html('Retry Sync').prop('disabled', false);
-                console.error('Sync error: ', error);
-            }
-        });
-    });
+            };
 
-    // Initialize tooltips
-    $('.sync-order-button').hover(function () {
-        var tooltip = $(this).attr('title');
-        if (tooltip) {
-            $(this).attr('data-tooltip', tooltip).removeAttr('title');
-        }
-    }, function () {
-        var tooltip = $(this).attr('data-tooltip');
-        if (tooltip) {
-            $(this).attr('title', tooltip).removeAttr('data-tooltip');
-        }
+            var data = 'action=wcospa_sync_order&order_id=' + encodeURIComponent(orderId) + '&security=' + encodeURIComponent(nonce);
+            xhr.send(data);
+        });
     });
 });
