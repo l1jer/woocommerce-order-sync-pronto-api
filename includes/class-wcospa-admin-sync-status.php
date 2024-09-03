@@ -47,7 +47,7 @@ class WCOSPA_Admin_Sync_Status {
         wp_enqueue_script('wcospa-sync-status', WCOSPA_URL . 'assets/js/wcospa-admin-sync-status.js', ['jquery'], WCOSPA_VERSION, true);
 
         // Ensure ajaxurl is defined for non-admin pages
-        wp_localize_script('wcospa-sync-status', 'ajaxurl', admin_url('admin-ajax.php'));
+        // wp_localize_script('wcospa-sync-status', 'ajaxurl', admin_url('admin-ajax.php'));
     }
 
 

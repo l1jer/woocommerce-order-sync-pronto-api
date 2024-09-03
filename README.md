@@ -3,7 +3,7 @@ Contributors: Jerry Li
 Tags: woocommerce, order sync, API, pronto
 Requires at least: 5.0
 Tested up to: 6.5.3
-Stable tag: 1.3.2.1
+Stable tag: 1.3.2.3
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -28,6 +28,21 @@ The WooCommerce Order Sync Pronto API plugin automatically syncs WooCommerce ord
 3. Configure your API credentials in the `wcospa-credentials.php` file located in `includes/`.
 
 == Changelog ==
+= 1.3.2.3 =
+- **Change:** Commented out all CRON job-related code for checking transactions and Pronto Order numbers.
+- **Feature:** Added a "Fetch" button next to the "Sync" button in the WooCommerce orders list.
+  - The "Fetch" button retrieves the Pronto Order number using the transaction UUID after sync.
+  - The "Fetch" button is activated 2 minutes after the "Sync" button is clicked, with a countdown timer displayed using AJAX.
+- **Improvement:** Placed "Sync" and "Fetch" buttons on a new line, separated from other order action buttons for better clarity.
+
+= 1.3.2.2 =
+- **Change:** Removed `price_ex_tax` from the API request.
+- **Change:** Updated price calculation for API: product prices are now divided by `1.1` before being sent, rounded to 2 decimal places.
+- **Change:** Updated delivery address formatting:
+  - `address1` now includes the customer's first and last name, capitalized.
+  - `address2` corresponds to the original `address_1`.
+  - `address3` corresponds to the original `address_2`.
+
 
 = 1.3.2.1 =
 - **Feature:** Updated delivery instructions handling:

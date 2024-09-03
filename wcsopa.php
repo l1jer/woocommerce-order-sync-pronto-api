@@ -24,7 +24,7 @@ require_once WCOSPA_PATH . 'includes/class-wcospa-order-data-formatter.php';
 require_once WCOSPA_PATH . 'includes/class-wcospa-logger.php';
 require_once WCOSPA_PATH . 'includes/class-wcospa-admin-sync-status.php';
 require_once WCOSPA_PATH . 'includes/class-wcospa-admin-orders-column.php';
-require_once WCOSPA_PATH . 'includes/class-wcospa-cron.php';
+// require_once WCOSPA_PATH . 'includes/class-wcospa-cron.php';
 require_once WCOSPA_PATH . 'includes/wcospa-credentials.php';
 
 // Initialize the plugin
@@ -33,6 +33,6 @@ function wcospa_init() {
     WCOSPA_Order_Sync_Button::init();
     WCOSPA_Admin_Sync_Status::init();
     WCOSPA_Admin_Orders_Column::init();
-    WCOSPA_Cron::init();
+    // WCOSPA_Cron::init();
 }
 add_action('plugins_loaded', 'wcospa_init');
