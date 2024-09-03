@@ -1,0 +1,21 @@
+.wcospa-order-column {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+}
+
+.wcospa-sync-fetch-buttons {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 5px;
+}
+
+.wcospa-sync-fetch-buttons .button {
+    margin-left: 5px;
+}
+
+.pronto-order-number {
+    text-align: right;
+    margin-top: 5px;
+    font-weight: bold;
+}
