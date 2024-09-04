@@ -8,14 +8,15 @@ if (!defined('ABSPATH')) {
 class WCOSPA_Order_Sync_Button {
 
     public static function init() {
-        add_action('woocommerce_admin_order_data_after_order_details', [__CLASS__, 'add_sync_button_to_pronto_column']);
+        // Add buttons to each WooCommerce order's General section (not Billing)
+        add_action('woocommerce_admin_order_data_after_order_details', [__CLASS__, 'add_sync_button_to_general_section']);
         add_action('admin_footer', [__CLASS__, 'enqueue_sync_button_script']);
         add_action('wp_ajax_wcospa_sync_order', [__CLASS__, 'handle_ajax_sync']);
         add_action('wp_ajax_wcospa_fetch_pronto_order', [__CLASS__, 'handle_ajax_fetch']);
     }
 
-    // Remove buttons from Actions column and add them to Pronto Order column
-    public static function add_sync_button_to_pronto_column($order) {
+    // Remove buttons from Actions column and add them to the General section in an individual div
+    public static function add_sync_button_to_general_section($order) {
         $order_id = $order->get_id();
         $transaction_uuid = get_post_meta($order_id, '_wcospa_transaction_uuid', true);
         $pronto_order_number = get_post_meta($order_id, '_wcospa_pronto_order_number', true);
@@ -41,10 +42,10 @@ class WCOSPA_Order_Sync_Button {
             }
         }
 
-        echo '<div class="wcospa-order-column">';
-
-        // Buttons will be aligned to the left
-        echo '<div class="wcospa-sync-fetch-buttons" style="display: flex; justify-content: flex-start; width: 100%;">';
+        // Display the buttons under General section in a separate div
+        echo '<div class="wcospa-sync-fetch-buttons" style="margin-top: 20px; border: 1px solid #ddd; padding: 10px;">';
+        echo '<h3>' . __('Sync Order with Pronto API', 'wcospa') . '</h3>';
+        echo '<div style="display: flex; justify-content: flex-start;">';
 
         echo '<button class="button wc-action-button wc-action-button-sync sync-order-button"
                   data-order-id="' . esc_attr($order_id) . '"
@@ -56,14 +57,14 @@ class WCOSPA_Order_Sync_Button {
                   data-nonce="' . esc_attr(wp_create_nonce('wcospa_fetch_order_nonce')) . '"
                   ' . disabled($fetch_disabled, true, false) . '>' . esc_html($fetch_button_text) . '</button>';
 
-        echo '</div>';  // Close the sync-fetch-buttons div
+        echo '</div>';
 
         // Display the Pronto Order number on a new line, left-aligned
         if ($pronto_order_number) {
-            echo '<div class="pronto-order-number" style="text-align: left; margin-top: 5px;">' . esc_html($pronto_order_number) . '</div>';
+            echo '<div class="pronto-order-number" style="text-align: left; margin-top: 10px;">' . esc_html($pronto_order_number) . '</div>';
         }
 
-        echo '</div>';  // Close the order-column div
+        echo '</div>';  // Close the buttons container div
     }
 
     public static function enqueue_sync_button_script() {
@@ -85,19 +86,12 @@ class WCOSPA_Order_Sync_Button {
             wp_send_json_error('This order has already been synced.');
         }
 
-        // Log the order ID being synced
-        error_log('Syncing order ID: ' . $order_id);
-
         // Sync the order and get the transaction UUID
         $uuid = WCOSPA_API_Client::send_order($order_id);
 
         if (is_wp_error($uuid)) {
-            error_log('API request failed: ' . $uuid->get_error_message()); // Log error message
             wp_send_json_error($uuid->get_error_message());
         }
-
-        // Log the successful response from the API
-        error_log('API request successful. UUID: ' . $uuid);
 
         // Store the UUID and sync time with the order
         update_post_meta($order_id, '_wcospa_transaction_uuid', $uuid);
@@ -108,7 +102,6 @@ class WCOSPA_Order_Sync_Button {
 
         wp_send_json_success('Order synced successfully. Transaction UUID: ' . $uuid);
     }
-
 
     public static function handle_ajax_fetch() {
         check_ajax_referer('wcospa_fetch_order_nonce', 'security');
