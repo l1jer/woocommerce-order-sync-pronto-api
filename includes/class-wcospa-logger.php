@@ -33,4 +33,11 @@ class WCOSPA_Logger {
     public static function clear_sync_logs() {
         delete_option(self::SYNC_LOG_OPTION);
     }
+
+    public static function log($message) {
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            // Write the log message to the WordPress debug log
+            error_log('[WCOSPA] ' . $message);
+        }
+    }
 }
