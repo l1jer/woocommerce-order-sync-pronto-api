@@ -28,6 +28,15 @@ The WooCommerce Order Sync Pronto API plugin automatically syncs WooCommerce ord
 3. Configure your API credentials in the `wcospa-credentials.php` file located in `includes/`.
 
 == Changelog ==
+= 1.3.2.5 =
+- **Bug Fix:** Resolved an error where the Fetch button was throwing a JSON parsing error due to HTML responses returned by the API. Now properly handles and logs invalid JSON or HTML responses.
+
+= 1.3.2.4 =
+- **Bug Fix:** Fixed an issue where the Transaction UUID was not correctly extracted from the sync response, even though the UUID was present.
+- **Improvement:** Added `try-catch` blocks around `JSON.parse()` in the JavaScript to prevent crashes when the API response is not valid JSON.
+- **Improvement:** Added logging for raw API responses to the debug log to capture the full body of responses, including potential HTML redirects.
+- **Improvement:** Updated the countdown timer logic for the Fetch button to handle page reloads and ensure consistent behavior when the timer is active.
+
 = 1.3.2.3 =
 - **Change:** Commented out all CRON job-related code for checking transactions and Pronto Order numbers.
 - **Feature:** Added a "Fetch" button next to the "Sync" button in the WooCommerce orders list.
