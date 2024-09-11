@@ -68,14 +68,12 @@ class WCOSPA_Admin_Orders_Column
                       data-order-id="'.esc_attr($post_id).'"
                       data-nonce="'.esc_attr(wp_create_nonce('wcospa_fetch_order_nonce')).'"
                       '.disabled($fetch_disabled, true, false).'>'.esc_html($fetch_button_text).'</button>';
-
+            echo '</div>';  // Close the sync-fetch-buttons div
             if ($pronto_order_number) {
                 echo '<div class="pronto-order-number">'.esc_html($pronto_order_number).'</div>';
             } else {
-                echo '<div class="pronto-order-number">-</div>';
+                echo '<div class="pronto-order-number"></div>';
             }
-
-            echo '</div>';  // Close the sync-fetch-buttons div
             echo '</div>';  // Close the order-column div
         }
     }
