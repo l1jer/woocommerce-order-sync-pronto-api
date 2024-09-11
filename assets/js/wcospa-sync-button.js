@@ -19,7 +19,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (xhr.status === 200) {
                     var response = JSON.parse(xhr.responseText);
                     if (response.success) {
-                        button.textContent = 'Already Synced';
+                        button.textContent = 'Synced';
                         button.disabled = true;
                         button.title = 'Synced on ' + new Date().toLocaleString(); // Add sync timestamp to tooltip
                         console.log('Sync successful: ', response);

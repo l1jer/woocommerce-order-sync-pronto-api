@@ -37,14 +37,14 @@ class WCOSPA_Order_Sync_Button
         $fetch_tooltip = 'Only available after a successful sync to Pronto'; // Tooltip for Fetch button
 
         if ($pronto_order_number) {
-            $sync_button_text = 'Already Synced';
+            $sync_button_text = 'Synced';
             $sync_disabled = true;
             $fetch_button_text = 'Fetched';
             $fetch_disabled = true;
         } elseif ($transaction_uuid) {
             // If sync was completed, disable the button and show the timestamp
             if ($sync_time_formatted) {
-                $sync_button_text = 'Already Synced';
+                $sync_button_text = 'Synced';
                 $sync_disabled = true;
                 $sync_tooltip = 'Synced on '.$sync_time_formatted;
             }
@@ -119,7 +119,7 @@ class WCOSPA_Order_Sync_Button
         update_post_meta($order_id, '_wcospa_transaction_uuid', $uuid);
         update_post_meta($order_id, '_wcospa_sync_time', time()); // Store the timestamp
 
-        // Mark the order as already synced
+        // Mark the order as Synced
         update_post_meta($order_id, '_wcospa_already_synced', true);
 
         wp_send_json_success('Order synced successfully. Transaction UUID: '.$uuid);
