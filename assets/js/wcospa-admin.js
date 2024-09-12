@@ -55,6 +55,15 @@ document.addEventListener('DOMContentLoaded', function () {
     // Sync Order Buttons
     var syncButtons = document.querySelectorAll('.sync-order-button');
     var fetchButtons = document.querySelectorAll('.fetch-order-button');
+    syncButtons.forEach(function (button) {
+        var orderId = button.getAttribute('data-order-id');
+        var syncStatus = localStorage.getItem('sync_status_' + orderId);
+        if (syncStatus === 'true') {
+            button.textContent = 'Synced';
+            button.disabled = true;
+            button.title = 'Synced on ' + new Date().toLocaleString(); // Add sync timestamp to tooltip
+        }
+    });
 
     syncButtons.forEach(function (button) {
         button.addEventListener('click', function () {
@@ -77,6 +86,9 @@ document.addEventListener('DOMContentLoaded', function () {
                         button.disabled = true;
                         button.title = 'Synced on ' + new Date().toLocaleString(); // Add sync timestamp to tooltip
                         console.log('Sync successful: ', response);
+
+                        // Save sync status in localStorage
+                        localStorage.setItem('sync_status_' + orderId, 'true');
 
                         // Start 120-second countdown for Fetch button
                         var countdown = 120;

@@ -19,11 +19,11 @@ define('WCOSPA_VERSION', '1.3.0');
 // Include required files
 require_once WCOSPA_PATH.'includes/class-wcospa-order-handler.php';
 require_once WCOSPA_PATH.'includes/class-wcospa-api-client.php';
-require_once WCOSPA_PATH.'includes/class-wcospa-order-sync-button.php';
-require_once WCOSPA_PATH.'includes/class-wcospa-order-data-formatter.php';
+// require_once WCOSPA_PATH.'includes/class-wcospa-order-sync-button.php';
+// require_once WCOSPA_PATH.'includes/class-wcospa-order-data-formatter.php';
 require_once WCOSPA_PATH.'includes/class-wcospa-logger.php';
 require_once WCOSPA_PATH.'includes/class-wcospa-admin-sync-status.php';
-require_once WCOSPA_PATH.'includes/class-wcospa-admin-orders-column.php';
+// require_once WCOSPA_PATH.'includes/class-wcospa-admin-orders-column.php';
 // require_once WCOSPA_PATH . 'includes/class-wcospa-cron.php';
 require_once WCOSPA_PATH.'includes/wcospa-credentials.php';
 
