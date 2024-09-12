@@ -5,16 +5,18 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-class WCOSPA_Admin_Sync_Status {
-
-    public static function init() {
+class WCOSPA_Admin_Sync_Status
+{
+    public static function init()
+    {
         add_action('admin_menu', [__CLASS__, 'add_sync_status_menu']);
         add_action('admin_enqueue_scripts', [__CLASS__, 'enqueue_scripts']);
         add_action('wp_ajax_wcospa_clear_sync_logs', [__CLASS__, 'clear_sync_logs']);
         add_action('wp_ajax_wcospa_clear_all_sync_data', [__CLASS__, 'clear_all_sync_data']); // New action
     }
 
-    public static function add_sync_status_menu() {
+    public static function add_sync_status_menu()
+    {
         add_submenu_page(
             'woocommerce',
             __('Order Sync Status', 'wcospa'),
@@ -25,7 +27,8 @@ class WCOSPA_Admin_Sync_Status {
         );
     }
 
-    public static function render_sync_status_page() {
+    public static function render_sync_status_page()
+    {
         $logs = WCOSPA_Logger::get_sync_logs();
         ?>
 <div class="wrap">
@@ -39,25 +42,27 @@ class WCOSPA_Admin_Sync_Status {
 <?php
     }
 
-    public static function enqueue_scripts($hook) {
+    public static function enqueue_scripts($hook)
+    {
         if ($hook !== 'woocommerce_page_wcospa-sync-status') {
             return;
         }
         wp_enqueue_script('jquery'); // Ensure jQuery is enqueued
-        wp_enqueue_script('wcospa-sync-status', WCOSPA_URL . 'assets/js/wcospa-admin-sync-status.js', ['jquery'], WCOSPA_VERSION, true);
+        wp_enqueue_script('wcospa-admin', WCOSPA_URL.'assets/js/wcospa-admin.js', ['jquery'], WCOSPA_VERSION, true);
 
         // Ensure ajaxurl is defined for non-admin pages
         // wp_localize_script('wcospa-sync-status', 'ajaxurl', admin_url('admin-ajax.php'));
     }
 
-
-    public static function clear_sync_logs() {
+    public static function clear_sync_logs()
+    {
         WCOSPA_Logger::clear_sync_logs();
         wp_send_json_success();
     }
 
     // New method to clear all sync data
-    public static function clear_all_sync_data() {
+    public static function clear_all_sync_data()
+    {
         // Get all WooCommerce orders
         $orders = get_posts([
             'post_type' => 'shop_order',
@@ -78,8 +83,8 @@ class WCOSPA_Admin_Sync_Status {
         wp_send_json_success(__('All sync data has been cleared.', 'wcospa'));
     }
 
-
-    private static function format_logs($logs) {
+    private static function format_logs($logs)
+    {
         if (empty($logs)) {
             return __('No sync records found.', 'wcospa');
         }

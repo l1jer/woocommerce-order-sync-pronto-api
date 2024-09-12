@@ -81,7 +81,7 @@ class WCOSPA_Admin_Orders_Column
     public static function enqueue_admin_styles_and_scripts()
     {
         wp_enqueue_style('wcospa-admin-style', WCOSPA_URL.'assets/css/wcospa-admin.css', [], WCOSPA_VERSION);
-        wp_enqueue_script('wcospa-sync-button', WCOSPA_URL.'assets/js/wcospa-sync-button.js', [], WCOSPA_VERSION, true);
+        wp_enqueue_script('wcospa-admin', WCOSPA_URL.'assets/js/wcospa-admin.js', [], WCOSPA_VERSION, true);
     }
 }
 
