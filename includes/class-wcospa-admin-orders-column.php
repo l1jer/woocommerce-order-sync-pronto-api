@@ -49,7 +49,7 @@ class WCOSPA_Admin_Orders_Column
             } elseif ($transaction_uuid) {
                 if (time() - $sync_time < 120) {
                     $remaining_time = 120 - (time() - $sync_time);
-                    $fetch_button_text = "Fetch in {$remaining_time}s";
+                    $fetch_button_text = "{$remaining_time}s";
                 } else {
                     $fetch_button_text = 'Fetch';
                     $fetch_disabled = false;
