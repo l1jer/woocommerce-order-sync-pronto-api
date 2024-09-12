@@ -87,7 +87,7 @@ class WCOSPA_Order_Sync_Button
 
     public static function enqueue_sync_button_script()
     {
-        wp_enqueue_script('wcospa-sync-button', WCOSPA_URL.'assets/js/wcospa-sync-button.js', ['jquery'], WCOSPA_VERSION, true);
+        wp_enqueue_script('wcospa-admin', WCOSPA_URL.'assets/js/wcospa-admin.js', ['jquery'], WCOSPA_VERSION, true);
         wp_enqueue_style('wcospa-admin-style', WCOSPA_URL.'assets/css/wcospa-admin.css', [], WCOSPA_VERSION);
     }
 
