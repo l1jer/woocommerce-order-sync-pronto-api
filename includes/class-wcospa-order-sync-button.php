@@ -61,10 +61,8 @@ class WCOSPA_Order_Sync_Button
         }
 
         // Display Sync and Fetch buttons under General section
-        echo '<div class="wcospa-sync-fetch-buttons" style="margin-top: 20px; border: 1px solid #ddd; padding: 10px;">';
-        echo '<h3>'.__('Sync Order with Pronto API', 'wcospa').'</h3>';
-        echo '<div style="display: flex; justify-content: flex-start;">';
-
+        echo '<div class="wcospa-sync-fetch-buttons" style="padding: 20px 1px 0 0;flex-direction: column;">';
+        echo '<div>';
         echo '<button class="button wc-action-button wc-action-button-sync sync-order-button"
                   data-order-id="'.esc_attr($order_id).'"
                   data-nonce="'.esc_attr(wp_create_nonce('wcospa_sync_order_nonce')).'"
@@ -79,7 +77,7 @@ class WCOSPA_Order_Sync_Button
 
         // Display Pronto Order number or "-"
         if ($pronto_order_number) {
-            echo '<div class="pronto-order-number" style="text-align: left; margin-top: 10px;">'.esc_html($pronto_order_number).'</div>';
+            echo '<div class="pronto-order-number" style="text-align: left; margin-top: 10px;">Pronto Order Number:'.esc_html($pronto_order_number).'</div>';
         } else {
             echo '<div class="pronto-order-number" style="text-align: left; margin-top: 10px;">-</div>';
         }

@@ -6,7 +6,7 @@
 
 .wcospa-sync-fetch-buttons {
     display: flex;
-    justify-content: flex-end;
+    align-items: flex-end;
 }
 
 .wcospa-sync-fetch-buttons .button {
@@ -14,6 +14,5 @@
 }
 
 .pronto-order-number {
-    text-align: right;
     font-weight: bold;
 }
