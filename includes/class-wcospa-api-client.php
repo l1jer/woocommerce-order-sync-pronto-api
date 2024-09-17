@@ -107,9 +107,6 @@ class WCOSPA_API_Client
         // Log the raw HTML body for debugging (this will show the source text in the log)
         WCOSPA_Logger::log('Raw Response Body: '.$raw_body);
 
-        // Also log the raw body in the browser console
-        echo "<script>console.log('Raw Response Body: ', ".json_encode($raw_body).');</script>';
-
         // Check if the response is an HTML redirect
         if (stripos($raw_body, '<html>') !== false) {
             WCOSPA_Logger::log('HTML response detected: '.$raw_body);

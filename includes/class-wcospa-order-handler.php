@@ -52,7 +52,7 @@ class WCOSPA_Order_Sync_Button
         $sync_disabled = false;
         $fetch_button_text = 'Fetch';
         $fetch_disabled = true;
-        $sync_tooltip = ''; // Tooltip for Sync button
+        $sync_tooltip = 'Only Available on Processing orders'; // Tooltip for Sync button
         $fetch_tooltip = 'Only available after a successful sync to Pronto'; // Tooltip for Fetch button
 
         if ($pronto_order_number) {
@@ -73,9 +73,10 @@ class WCOSPA_Order_Sync_Button
                 $remaining_time = 120 - (time() - $sync_time);
                 $fetch_button_text = "{$remaining_time}s";
                 $fetch_disabled = true;
+                $fetch_tooltip = 'Will be available after this certain time';
             } else {
                 $fetch_disabled = false;
-                $fetch_tooltip = ''; // Remove tooltip when fetch is enabled
+                $fetch_tooltip = 'Only available after a successful sync to Pronto'; // Remove tooltip when fetch is enabled
             }
         }
 
@@ -331,12 +332,5 @@ class WCOSPA_Order_Data_Formatter
         }
 
         return $formatted_items;
-    }
-
-    // New function to format the amount and ensure it's a string without trailing ".00"
-    private static function format_amount($amount)
-    {
-        // Convert amount to string and remove trailing ".00" if present
-        return rtrim(rtrim((string) $amount, '0'), '.');
     }
 }
