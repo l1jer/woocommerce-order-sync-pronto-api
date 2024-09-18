@@ -21,8 +21,8 @@ class WCOSPA_API_Client
         $order_data = WCOSPA_Order_Data_Formatter::format_order($order, $customer_reference);
 
         // Log the sync URL and order data for debugging
-        WCOSPA_Logger::log('Sync URL: '.$api_url);
-        WCOSPA_Logger::log('Order Data: '.print_r($order_data, true));
+        WCOSPA_API_Client::log('Sync URL: '.$api_url);
+        WCOSPA_API_Client::log('Order Data: '.print_r($order_data, true));
 
         // Make the POST request to the API to sync the order
         $response = wp_remote_post($api_url, [
@@ -35,7 +35,7 @@ class WCOSPA_API_Client
         ]);
 
         if (is_wp_error($response)) {
-            WCOSPA_Logger::log('Sync API request failed: '.$response->get_error_message());
+            WCOSPA_API_Client::log('Sync API request failed: '.$response->get_error_message());
 
             return $response;
         }
@@ -43,24 +43,24 @@ class WCOSPA_API_Client
         // Check if the response body is empty
         $body = wp_remote_retrieve_body($response);
         if (empty($body)) {
-            WCOSPA_Logger::log('Sync response body is empty.');
+            WCOSPA_API_Client::log('Sync response body is empty.');
 
             return new WP_Error('empty_response', 'The API returned an empty response.');
         }
 
         // Decode the response body and log for debugging
         $body = json_decode($body, true);
-        WCOSPA_Logger::log('Sync response body: '.print_r($body, true));
+        WCOSPA_API_Client::log('Sync response body: '.print_r($body, true));
 
         // Extract the Transaction UUID from the apitransactions array
         if (isset($body['apitransactions'][0]['uuid'])) {
             $transaction_uuid = $body['apitransactions'][0]['uuid'];
             update_post_meta($order_id, '_wcospa_transaction_uuid', $transaction_uuid);
-            WCOSPA_Logger::log('Stored Transaction UUID: '.$transaction_uuid);
+            WCOSPA_API_Client::log('Stored Transaction UUID: '.$transaction_uuid);
 
             return $transaction_uuid;
         } else {
-            WCOSPA_Logger::log('Transaction UUID not found in sync response.');
+            WCOSPA_API_Client::log('Transaction UUID not found in sync response.');
 
             return new WP_Error('uuid_not_found', 'Transaction UUID not found.');
         }
@@ -85,7 +85,7 @@ class WCOSPA_API_Client
         $transaction_url = $credentials['get_transaction'].'?uuid='.$transaction_uuid;
 
         // Log the transaction URL for debugging
-        WCOSPA_Logger::log('Transaction URL: '.$transaction_url);
+        WCOSPA_API_Client::log('Transaction URL: '.$transaction_url);
 
         // Make the GET request to the API
         $response = wp_remote_get($transaction_url, [
@@ -96,7 +96,7 @@ class WCOSPA_API_Client
         ]);
 
         if (is_wp_error($response)) {
-            WCOSPA_Logger::log('Fetch API request failed: '.$response->get_error_message());
+            WCOSPA_API_Client::log('Fetch API request failed: '.$response->get_error_message());
 
             return $response;
         }
@@ -105,21 +105,21 @@ class WCOSPA_API_Client
         $raw_body = wp_remote_retrieve_body($response);
 
         // Log the raw HTML body for debugging (this will show the source text in the log)
-        WCOSPA_Logger::log('Raw Response Body: '.$raw_body);
+        WCOSPA_API_Client::log('Raw Response Body: '.$raw_body);
 
         // Check if the response is an HTML redirect
         if (stripos($raw_body, '<html>') !== false) {
-            WCOSPA_Logger::log('HTML response detected: '.$raw_body);
+            WCOSPA_API_Client::log('HTML response detected: '.$raw_body);
 
             return new WP_Error('html_response_detected', 'The API returned an HTML response.');
         }
 
         // Decode the JSON response
         $body = json_decode($raw_body, true);
-        WCOSPA_Logger::log('Fetch response body (decoded): '.print_r($body, true));
+        WCOSPA_API_Client::log('Fetch response body (decoded): '.print_r($body, true));
 
         if (!isset($body['apitransactions'][0]['result_url'])) {
-            WCOSPA_Logger::log('Pronto Order number not found in fetch response.');
+            WCOSPA_API_Client::log('Pronto Order number not found in fetch response.');
 
             return new WP_Error('order_number_not_found', 'Pronto Order number not found.');
         }
@@ -135,7 +135,7 @@ class WCOSPA_API_Client
         // Store the Pronto Order number in the order meta
         update_post_meta($order_id, '_wcospa_pronto_order_number', $pronto_order_number);
 
-        WCOSPA_Logger::log('Stored Pronto Order number: '.$pronto_order_number);
+        WCOSPA_API_Client::log('Stored Pronto Order number: '.$pronto_order_number);
 
         return $pronto_order_number;
     }
@@ -159,7 +159,7 @@ class WCOSPA_API_Client
         $order_url = $credentials['get_order'].'?number='.$pronto_order_number;
 
         // Log the order URL for debugging
-        WCOSPA_Logger::log('Order URL: '.$order_url);
+        WCOSPA_API_Client::log('Order URL: '.$order_url);
 
         // Make the GET request to the API
         $response = wp_remote_get($order_url, [
@@ -170,18 +170,26 @@ class WCOSPA_API_Client
         ]);
 
         if (is_wp_error($response)) {
-            WCOSPA_Logger::log('Pronto Order API request failed: '.$response->get_error_message());
+            WCOSPA_API_Client::log('Pronto Order API request failed: '.$response->get_error_message());
 
             return $response;
         }
 
         $body = json_decode(wp_remote_retrieve_body($response), true);
-        WCOSPA_Logger::log('Pronto Order response body: '.print_r($body, true));
+        WCOSPA_API_Client::log('Pronto Order response body: '.print_r($body, true));
 
         if (empty($body)) {
             return new WP_Error('empty_response', 'The API returned an empty response.');
         }
 
         return $body; // Return the Pronto order details
+    }
+
+    public static function log($message)
+    {
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            // Write the log message to the WordPress debug log
+            error_log('[WCOSPA] '.$message);
+        }
     }
 }
