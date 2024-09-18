@@ -28,6 +28,16 @@ The WooCommerce Order Sync Pronto API plugin automatically syncs WooCommerce ord
 3. Configure your API credentials in the `wcospa-credentials.php` file located in `includes/`.
 
 == Changelog ==
+= 1.4.0 =
+- **Feature:** Automatically sync orders upon successful processing in WooCommerce without requiring manual actions.
+- **Improvement:** Remove Sync button from the WooCommerce order admin.
+- **Improvement:**Remove Fetch button countdown timer.
+- **Improvement:** Delivery address formatting updated to capitalize customer names.
+- **Improvement:** Delivery instructions include customer email and order notes (if available) in the API request.
+- **Improvement:** Remove manual sync log display; logs are now stored directly in `debug.log` for simplicity.
+- **Bug Fix:** Pronto Order number fetched and displayed automatically after syncing.
+
+
 = 1.3.2.5 =
 - **Bug Fix:** Resolved an error where the Fetch button was throwing a JSON parsing error due to HTML responses returned by the API. Now properly handles and logs invalid JSON or HTML responses.
 
@@ -132,6 +142,14 @@ The "Clear All Sync Data" button on the Sync Status page will reset the sync sta
 If the transaction status is "Pending", the plugin will automatically check the status every minute for up to 10 minutes. Once the status changes to "Complete", the Pronto Order number will be retrieved and displayed.
 
 == Upgrade Notice ==
+= 1.4.0 =
+- Major refactoring and removal of manual buttons and redundant features. Automated syncing and improved order processing.
+
+= 1.3.2.5 =
+- Bug fix for Fetch button JSON error handling.
+
+= 1.3.2.4 =
+- Improvements in error handling and API response logging.
 
 = 1.3.0 =
 - Major update introducing automatic status checks and Pronto Order number display in the WooCommerce Orders admin page.
