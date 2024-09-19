@@ -11,8 +11,6 @@ class WCOSPA_Admin_Sync_Status
     {
         add_action('admin_menu', [__CLASS__, 'add_sync_status_menu']);
         add_action('admin_enqueue_scripts', [__CLASS__, 'enqueue_scripts']);
-        // Commented out the AJAX handler for clearing sync logs
-        // add_action('wp_ajax_wcospa_clear_sync_logs', [__CLASS__, 'clear_sync_logs']);
         add_action('wp_ajax_wcospa_clear_all_sync_data', [__CLASS__, 'clear_all_sync_data']); // Keep "Clear All Sync Data" functionality
     }
 
@@ -30,7 +28,6 @@ class WCOSPA_Admin_Sync_Status
 
     public static function render_sync_status_page()
     {
-        // Comment out the log display part, only keep the "Clear All Sync Data" button
         ?>
         <div class="wrap">
             <h1><?php _e('WooCommerce Order Sync Pronto API - Order Status', 'wcospa'); ?></h1>
@@ -46,8 +43,7 @@ class WCOSPA_Admin_Sync_Status
         if ($hook !== 'woocommerce_page_wcospa-sync-status') {
             return;
         }
-        wp_enqueue_script('jquery'); // Ensure jQuery is enqueued
-        wp_enqueue_script('wcospa-admin', WCOSPA_URL.'assets/js/wcospa-admin.js', ['jquery'], WCOSPA_VERSION, true);
+        wp_enqueue_script('wcospa-admin', WCOSPA_URL.'assets/js/wcospa-admin.js', [], WCOSPA_VERSION, true);
     }
 
     // Keep the method to clear all sync data
