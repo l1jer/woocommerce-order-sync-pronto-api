@@ -161,28 +161,32 @@ class WCOSPA_Order_Data_Formatter
         $shipping_email = $order->get_meta('_shipping_email');
         $customer_provided_note = $order->get_customer_note(); // Get the customer-provided note
 
-        // Combine delivery instructions into a single string
-        $delivery_instructions = implode(', ', [
-            'NO INVOICE & PACKING SLIP', // del_inst_1: Uppercase instruction
-            $billing_email !== $shipping_email && $shipping_email ? $shipping_email : $billing_email, // del_inst_2: Customer email from shipping if different
-            !empty($customer_provided_note) ? substr($customer_provided_note, 0, 30) : '', // del_inst_3: Customer-provided note, limited to 30 characters
-        ]);
+        // 分别设置 delivery_instructions 各个字段
+        $delivery_instructions = [
+            'del_inst_1' => 'NO INVOICE & PACKING SLIP',
+            'del_inst_2' => $billing_email !== $shipping_email && $shipping_email ? $shipping_email : $billing_email,
+            'del_inst_3' => !empty($customer_provided_note) ? $customer_provided_note : '',
+            'del_inst_4' => '',
+            'del_inst_5' => '',
+            'del_inst_6' => '',
+            'del_inst_7' => '',
+        ];
 
         return [
             'customer_reference' => $customer_reference,
             'debtor' => '210942', // Updated debtor code
             'delivery_address' => [
-                'address1' => strtoupper($order->get_shipping_first_name().' '.$order->get_shipping_last_name()), // Capitalized name
+                'address1' => strtoupper($order->get_shipping_first_name().' '.$order->get_shipping_last_name()),
                 'address2' => $shipping_address['address_1'],
                 'address3' => $shipping_address['address_2'],
                 'address4' => $shipping_address['city'],
                 'address5' => $shipping_address['state'],
                 'address6' => $shipping_address['country'],
-                'address7' => '', // Keep empty as per requirements
+                'address7' => '',
                 'postcode' => $shipping_address['postcode'],
                 'phone' => $order->get_billing_phone(),
             ],
-            'delivery_instructions' => $delivery_instructions, // Single string of delivery instructions
+            'delivery_instructions' => $delivery_instructions,
             'payment' => [
                 'method' => self::convert_payment_method($order->get_payment_method()),
                 'reference' => $order->get_transaction_id(),
