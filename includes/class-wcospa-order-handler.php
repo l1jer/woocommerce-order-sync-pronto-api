@@ -14,12 +14,14 @@ class WCOSPA_Order_Handler
 
     public static function handle_order_sync($order_id)
     {
-        $response = WCOSPA_API_Client::sync_order($order_id);  // Corrected method call
+        $response = WCOSPA_API_Client::sync_order($order_id);
 
         if (is_wp_error($response)) {
             error_log('Order sync failed: '.$response->get_error_message());
         } else {
-            error_log('Order sync successful for Order ID: '.$order_id);
+            $order = wc_get_order($order_id);
+            $order->update_status('wc-pronto-received', 'Order marked as Pronto Received after successful API sync.');
+            error_log('Order '.$order_id.' updated to Pronto Received by API sync.');
         }
     }
 }
@@ -36,7 +38,7 @@ class WCOSPA_Order_Sync_Button
 
     public static function enqueue_sync_button_script()
     {
-        wp_enqueue_script('wcospa-admin', WCOSPA_URL.'assets/js/wcospa-admin.js', [], WCOSPA_VERSION, true);
+        wp_enqueue_script('wcospa-admin', WCOSPA_URL.'assets/js/wcospa-admin.js', ['jquery'], WCOSPA_VERSION, true);
         wp_enqueue_style('wcospa-admin-style', WCOSPA_URL.'assets/css/wcospa-admin.css', [], WCOSPA_VERSION);
     }
 
@@ -127,25 +129,25 @@ class WCOSPA_Admin_Orders_Column
             }
 
             echo '<div class="wcospa-order-column">';
-            echo '<div class="wcospa-sync-fetch-buttons" style="display: flex; justify-content: flex-end; width: 100%;">';
+            echo '<div class="wcospa-sync-fetch-buttons" style="justify-content: flex-end; width: 100%;">';
             echo '<button class="button wc-action-button wc-action-button-fetch fetch-order-button"
                       data-order-id="'.esc_attr($post_id).'"
                       data-nonce="'.esc_attr(wp_create_nonce('wcospa_fetch_order_nonce')).'"
                       '.disabled($fetch_disabled, true, false).'>'.esc_html($fetch_button_text).'</button>';
-            echo '</div>';  // Close the sync-fetch-buttons div
+            echo '</div>';
             if ($pronto_order_number) {
                 echo '<div class="pronto-order-number">'.esc_html($pronto_order_number).'</div>';
             } else {
                 echo '<div class="pronto-order-number"></div>';
             }
-            echo '</div>';  // Close the order-column div
+            echo '</div>';
         }
     }
 
     public static function enqueue_admin_styles_and_scripts()
     {
         wp_enqueue_style('wcospa-admin-style', WCOSPA_URL.'assets/css/wcospa-admin.css', [], WCOSPA_VERSION);
-        wp_enqueue_script('wcospa-admin', WCOSPA_URL.'assets/js/wcospa-admin.js', [], WCOSPA_VERSION, true);
+        wp_enqueue_script('wcospa-admin', WCOSPA_URL.'assets/js/wcospa-admin.js', ['jquery'], WCOSPA_VERSION, true);
     }
 }
 
@@ -159,76 +161,176 @@ class WCOSPA_Order_Data_Formatter
         $shipping_address = $order_data['shipping'];
         $billing_email = $order->get_billing_email();
         $shipping_email = $order->get_meta('_shipping_email');
-        $customer_provided_note = $order->get_customer_note(); // Get the customer-provided note
+        $customer_provided_note = $order->get_customer_note();
 
-        // 分别设置 delivery_instructions 各个字段
-        $delivery_instructions = [
-            'del_inst_1' => 'NO INVOICE & PACKING SLIP',
-            'del_inst_2' => $billing_email !== $shipping_email && $shipping_email ? $shipping_email : $billing_email,
-            'del_inst_3' => !empty($customer_provided_note) ? $customer_provided_note : '',
-            'del_inst_4' => '',
-            'del_inst_5' => '',
-            'del_inst_6' => '',
-            'del_inst_7' => '',
+        // Combine delivery instructions
+        $delivery_instructions = '*NO INVOICE AND PACKING SLIP* '.
+        ($billing_email !== $shipping_email && $shipping_email ? $shipping_email."\n" : $billing_email."\n").
+        (!empty($customer_provided_note) ? ' '.$customer_provided_note : '');
+
+        // Get business name (assuming it's stored as _shipping_company in the order)
+        $business_name = $order->get_meta('_shipping_company');
+
+        // Determine delivery address based on the conditions
+        $delivery_address = [
+            'address1' => strtoupper($order->get_shipping_first_name().' '.$order->get_shipping_last_name()),
+            'address2' => '',
+            'address3' => '',
+            'address4' => '',
+            'address5' => '',
+            'postcode' => $shipping_address['postcode'],
+            'phone' => $order->get_billing_phone(),
         ];
 
+        // Apply the conditions to modify the delivery address
+        if (empty($business_name) && empty($shipping_address['address_2'])) {
+            // 1. No business name and no 2nd address line
+            $delivery_address['address2'] = $shipping_address['address_1'];
+            $delivery_address['address3'] = $shipping_address['city'].' '.$shipping_address['state'];
+        } elseif (empty($business_name) && !empty($shipping_address['address_2'])) {
+            // 2. No business name, but 2nd address line exists
+            $delivery_address['address2'] = $shipping_address['address_1'];
+            $delivery_address['address3'] = $shipping_address['address_2'];
+            $delivery_address['address4'] = $shipping_address['city'].' '.$shipping_address['state'];
+        } elseif (!empty($business_name) && empty($shipping_address['address_2'])) {
+            // 3. Business name exists, but no 2nd address line
+            $delivery_address['address2'] = $business_name;
+            $delivery_address['address3'] = $shipping_address['address_1'];
+            $delivery_address['address4'] = $shipping_address['city'].' '.$shipping_address['state'];
+        } elseif (!empty($business_name) && !empty($shipping_address['address_2'])) {
+            // 4. Both business name and 2nd address line exist
+            $delivery_address['address2'] = $business_name;
+            $delivery_address['address3'] = $shipping_address['address_1'];
+            $delivery_address['address4'] = $shipping_address['address_2'];
+            $delivery_address['address5'] = $shipping_address['city'].' '.$shipping_address['state'];
+        }
+
+        // Get payment method from the order
+        $payment_method = $order->get_payment_method();
+
+        // Return the formatted order data
         return [
             'customer_reference' => $customer_reference,
-            'debtor' => '210942', // Updated debtor code
-            'delivery_address' => [
-                'address1' => strtoupper($order->get_shipping_first_name().' '.$order->get_shipping_last_name()),
-                'address2' => $shipping_address['address_1'],
-                'address3' => $shipping_address['address_2'],
-                'address4' => $shipping_address['city'],
-                'address5' => $shipping_address['state'],
-                'address6' => $shipping_address['country'],
-                'address7' => '',
-                'postcode' => $shipping_address['postcode'],
-                'phone' => $order->get_billing_phone(),
-            ],
+            'debtor' => '210942',
+            'delivery_address' => $delivery_address,
             'delivery_instructions' => $delivery_instructions,
             'payment' => [
-                'method' => self::convert_payment_method($order->get_payment_method()),
+                'method' => self::convert_payment_method($payment_method),
                 'reference' => $order->get_transaction_id(),
                 'amount' => $order->get_total(),
                 'currency_code' => $order->get_currency(),
             ],
-            'lines' => self::format_order_items($order->get_items()),
+            'lines' => self::format_order_items($order->get_items(), $payment_method),
         ];
     }
 
     private static function convert_payment_method($method)
     {
+        WCOSPA_API_Client::log('Order payment method: '.$method);
+
+        // Correct payment method mapping
         $payment_mapping = [
-            'paypal' => 'PP',
-            'credit_card' => 'CC',
+            'ppcp' => 'PP',          // PayPal
+            'afterpay' => 'CC', // AfterPay
+            'stripe_cc' => 'CC', // Stripe Credit Card
         ];
 
-        return $payment_mapping[$method] ?? $payment_mapping['default'];
+        // Check if the payment method exists in the mapping
+        if (!isset($payment_mapping[$method])) {
+            WCOSPA_API_Client::log('Payment method not found in mapping: '.$method);
+        }
+
+        return $payment_mapping[$method] ?? 'CC'; // Return the mapped method or 'CC'
     }
 
-    private static function format_order_items($items)
+    private static function format_order_items($items, $payment_method)
     {
         $formatted_items = [];
+
         foreach ($items as $item_id => $item) {
             $product = $item->get_product();
             if (!$product || !$product->get_sku()) {
                 error_log('Product or SKU not found for item ID: '.$item_id);
-                continue; // Skip items without a valid product or SKU
+                continue;
             }
 
-            // Calculate the price for API (price divided by 1.1)
+            // Calculate the price excluding tax
             $price_ex_tax = $item->get_total() / 1.1;
 
+            // Add the formatted item to the list
             $formatted_items[] = [
-                'type' => 'SN', // Assuming 'SN' for normal items, adjust as necessary
+                'type' => 'SN',
                 'item_code' => $product->get_sku(),
                 'quantity' => (string) $item->get_quantity(),
-                'uom' => 'EA', // Default unit of measure
-                'price_inc_tax' => (string) round($price_ex_tax, 2), // Send the price after dividing by 1.1, rounded to 2 decimal places
+                'uom' => 'EA',
+                'price_inc_tax' => (string) round($price_ex_tax, 2),
+            ];
+        }
+
+        // Add an extra item based on the payment method
+        $description = '';
+        switch ($payment_method) {
+            case 'ppcp':
+                $description = 'PayPal';
+                break;
+            case 'stripe_cc':
+                $description = 'Credit Card - Stripe';
+                break;
+            case 'afterpay':
+                $description = 'AfterPay';
+                break;
+        }
+
+        if (!empty($description)) {
+            $formatted_items[] = [
+                'type' => 'DN',
+                'item_code' => 'Note',
+                'description' => $description,
+                'quantity' => '0',
+                'uom' => '',
+                'price_inc_tax' => '0',
             ];
         }
 
         return $formatted_items;
     }
 }
+
+function register_pronto_received_order_status()
+{
+    register_post_status('wc-pronto-received', [
+        'label' => 'Pronto Received',
+        'public' => true,
+        'exclude_from_search' => false,
+        'show_in_admin_all_list' => true,
+        'show_in_admin_status_list' => true,
+        'label_count' => _n_noop('Pronto Received <span class="count">(%s)</span>', 'Pronto Received <span class="count">(%s)</span>'),
+    ]);
+}
+add_action('init', 'register_pronto_received_order_status');
+
+function add_pronto_received_to_order_statuses($order_statuses)
+{
+    $new_order_statuses = [];
+
+    foreach ($order_statuses as $key => $status) {
+        $new_order_statuses[$key] = $status;
+        if ('wc-processing' === $key) {
+            $new_order_statuses['wc-pronto-received'] = 'Pronto Received';
+        }
+    }
+
+    return $new_order_statuses;
+}
+add_filter('wc_order_statuses', 'add_pronto_received_to_order_statuses');
+
+function wc_custom_order_status_styles()
+{
+    echo '<style>
+        .status-pronto-received {
+            background-color: orange !important;
+            color: white !important;
+        }
+    </style>';
+}
+add_action('admin_head', 'wc_custom_order_status_styles');

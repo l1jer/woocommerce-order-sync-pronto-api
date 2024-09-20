@@ -11,7 +11,7 @@ class WCOSPA_Admin_Sync_Status
     {
         add_action('admin_menu', [__CLASS__, 'add_sync_status_menu']);
         add_action('admin_enqueue_scripts', [__CLASS__, 'enqueue_scripts']);
-        add_action('wp_ajax_wcospa_clear_all_sync_data', [__CLASS__, 'clear_all_sync_data']); // Keep "Clear All Sync Data" functionality
+        add_action('wp_ajax_wcospa_clear_all_sync_data', [__CLASS__, 'clear_all_sync_data']);
     }
 
     public static function add_sync_status_menu()

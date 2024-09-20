@@ -4,11 +4,6 @@
     align-items: flex-end;
 }
 
-.wcospa-sync-fetch-buttons {
-    display: flex;
-    align-items: flex-end;
-}
-
 .wcospa-sync-fetch-buttons .button {
     margin-left: 5px;
 }

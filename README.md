@@ -28,6 +28,14 @@ The WooCommerce Order Sync Pronto API plugin automatically syncs WooCommerce ord
 3. Configure your API credentials in the `wcospa-credentials.php` file located in `includes/`.
 
 == Changelog ==
+
+= 1.4.1 =
+- **Feature:** Added a new custom order status `Pronto Received` (`wc-pronto-received`), which tracks orders that have been successfully synced with the Pronto API.
+- **Improvement:** Updated delivery instructions for more accurate and clearer formatting.
+- **Improvement:** Amended the delivery address structure
+- **Improvement:** The "Fetch" button in the admin order page has been hidden.
+
+
 = 1.4.0 =
 - **Feature:** Automatically sync orders upon successful processing in WooCommerce without requiring manual actions.
 - **Improvement:** Remove Sync button from the WooCommerce order admin.
