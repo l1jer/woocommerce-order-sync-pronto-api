@@ -34,6 +34,9 @@ class WCOSPA_API_Client
             'timeout' => 20, // Set a timeout of 20 seconds
         ]);
 
+        // $order->update_status('wc-pronto-received', 'Order marked as Pronto Received after successful API sync.');
+        // error_log('Order '.$order_id.' updated to Pronto Received by API sync.');
+
         if (is_wp_error($response)) {
             WCOSPA_API_Client::log('Sync API request failed: '.$response->get_error_message());
 

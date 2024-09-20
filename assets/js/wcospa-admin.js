@@ -76,48 +76,48 @@ document.addEventListener("DOMContentLoaded", function () {
     // Sync Order Buttons
     // var syncButtons = document.querySelectorAll(".sync-order-button");
     var fetchButtons = document.querySelectorAll(".fetch-order-button");
-    syncButtons.forEach(function (button) {
-        var orderId = button.getAttribute("data-order-id");
-        var syncStatus = localStorage.getItem("sync_status_" + orderId);
-        if (syncStatus === "true") {
-            button.textContent = "Synced";
-            button.disabled = true;
-            button.title = "Synced on " + new Date().toLocaleString(); // Add sync timestamp to tooltip
-        }
-    });
+    // syncButtons.forEach(function (button) {
+    //     var orderId = button.getAttribute("data-order-id");
+    //     var syncStatus = localStorage.getItem("sync_status_" + orderId);
+    //     if (syncStatus === "true") {
+    //         button.textContent = "Synced";
+    //         button.disabled = true;
+    //         button.title = "Synced on " + new Date().toLocaleString(); // Add sync timestamp to tooltip
+    //     }
+    // });
 
-    syncButtons.forEach(function (button) {
-        button.addEventListener("click", function () {
-            var orderId = button.getAttribute("data-order-id");
-            var nonce = button.getAttribute("data-nonce");
-            var fetchButton = document.querySelector('.fetch-order-button[data-order-id="' + orderId + '"]');
+    // syncButtons.forEach(function (button) {
+    //     button.addEventListener("click", function () {
+    //         var orderId = button.getAttribute("data-order-id");
+    //         var nonce = button.getAttribute("data-nonce");
+    //         var fetchButton = document.querySelector('.fetch-order-button[data-order-id="' + orderId + '"]');
 
-            var xhr = new XMLHttpRequest();
-            xhr.open("POST", ajaxurl, true);
-            xhr.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
-            xhr.onload = function () {
-                if (xhr.status === 200) {
-                    var response = JSON.parse(xhr.responseText);
-                    if (response.success) {
-                        var countdown = 120;
-                        var countdownInterval = setInterval(function () {
-                            if (countdown > 0) {
-                                fetchButton.textContent = countdown + "s";
-                                fetchButton.disabled = true;
-                                countdown--;
-                            } else {
-                                clearInterval(countdownInterval);
-                                fetchButton.textContent = "Fetch";
-                                fetchButton.disabled = false;
-                            }
-                        }, 1000);
-                    }
-                }
-            };
+    //         var xhr = new XMLHttpRequest();
+    //         xhr.open("POST", ajaxurl, true);
+    //         xhr.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
+    //         xhr.onload = function () {
+    //             if (xhr.status === 200) {
+    //                 var response = JSON.parse(xhr.responseText);
+    //                 if (response.success) {
+    //                     var countdown = 120;
+    //                     var countdownInterval = setInterval(function () {
+    //                         if (countdown > 0) {
+    //                             fetchButton.textContent = countdown + "s";
+    //                             fetchButton.disabled = true;
+    //                             countdown--;
+    //                         } else {
+    //                             clearInterval(countdownInterval);
+    //                             fetchButton.textContent = "Fetch";
+    //                             fetchButton.disabled = false;
+    //                         }
+    //                     }, 1000);
+    //                 }
+    //             }
+    //         };
 
-            xhr.send("action=wcospa_sync_order&order_id=" + encodeURIComponent(orderId) + "&security=" + encodeURIComponent(nonce));
-        });
-    });
+    //         xhr.send("action=wcospa_sync_order&order_id=" + encodeURIComponent(orderId) + "&security=" + encodeURIComponent(nonce));
+    //     });
+    // });
 
     fetchButtons.forEach(function (button) {
         var orderId = button.getAttribute("data-order-id");
