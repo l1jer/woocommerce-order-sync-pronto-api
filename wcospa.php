@@ -2,7 +2,7 @@
 /*
 Plugin Name: WooCommerce Order Sync Pronto API
 Description: Automatically syncs WooCommerce orders with the Pronto API upon successful processing. Includes a manual sync button in the WooCommerce admin order actions.
-Version: 1.4.3
+Version: 1.4.4
 Author: Jerry Li
 Text Domain: wcospa
 */

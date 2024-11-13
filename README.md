@@ -28,6 +28,15 @@ The WooCommerce Order Sync Pronto API plugin automatically syncs WooCommerce ord
 3. Configure your API credentials in the `wcospa-credentials.php` file located in `includes/`.
 
 == Changelog ==
+= 1.4.4 =
+- **Improvement:** Updated `format_order_items` method to calculate `price_ex_tax` per product item, storing it in each product’s `price_ex_tax` field by dividing the `price_inc_tax` by 1.1.
+- **Improvement:** Updated `amount` field in `format_order` method to use the sum of all `price_inc_tax` values across products, ensuring the correct total amount in `payment`.
+- **Improvement:** Moved discount note entry in the `lines` array to follow all product items, clarifying line item sequence.
+- **Improvement:** Replaced direct `get_meta('_shipping_company')` calls with WooCommerce's recommended `get_shipping_company()` method to avoid internal meta key usage errors and align with WooCommerce’s best practices.
+- **Improvement:** `price_inc_tax_per_item` and `price_ex_tax_per_item` are now calculated based on each product's single-unit price, unaffected by product quantity.
+- **Improvement:** `total_price_inc_tax` now accumulates all `price_inc_tax` values for accurate final payment calculation.
+
+
 = 1.4.3 =
 - **Improvement:** When order has coupon code or any product on sale, add a note item in order indicates the order has coupon.
 
