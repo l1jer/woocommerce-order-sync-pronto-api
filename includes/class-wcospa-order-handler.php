@@ -219,6 +219,7 @@ class WCOSPA_Order_Data_Formatter
                 'reference' => $order->get_transaction_id(),
                 'amount' => $order->get_total(),
                 'currency_code' => $order->get_currency(),
+                'bank_code' => self::get_bank_code($payment_method),
             ],
             'lines' => self::format_order_items($order->get_items(), $payment_method),
         ];
@@ -241,6 +242,21 @@ class WCOSPA_Order_Data_Formatter
         }
 
         return $payment_mapping[$method] ?? 'CC'; // Return the mapped method or 'CC'
+    }
+
+    // return BANK CODE regarding to payment methods due to Pronto transaction requirements where indicates payment method on each transaction
+    private static function get_bank_code($payment_method)
+    {
+        switch ($payment_method) {
+            case 'ppcp':
+                return 'PAYPAL';
+            case 'stripe_cc':
+                return 'STRIPE';
+            case 'afterpay':
+                return 'AFTER';
+            default:
+                return '';
+        }
     }
 
     private static function format_order_items($items, $payment_method)

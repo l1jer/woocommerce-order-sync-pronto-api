@@ -29,6 +29,9 @@ The WooCommerce Order Sync Pronto API plugin automatically syncs WooCommerce ord
 
 == Changelog ==
 
+= 1.4.2 =
+- **Improvement:** Include the bank_code in the payment section of the API when submitting an order to meet Pronto transaction requirements, as this indicates the payment method for each transaction. Without it, the accountant won’t be able to identify the appropriate payment method for each transaction.
+
 = 1.4.1 =
 - **Feature:** Added a new custom order status `Pronto Received` (`wc-pronto-received`), which tracks orders that have been successfully synced with the Pronto API.
 - **Improvement:** Updated delivery instructions for more accurate and clearer formatting.
@@ -224,3 +227,4 @@ address1 should go with customer first name and last name, capitalised
 address2 is $shipping_address['address_1']
 address3 is $shipping_address['address_2']
 10. Add a CHECK button next to Sync to check the Pronto Order number, only activated when SYNC button clicked after 2 mins,
+11. Bank Code: 111025 is PayPal, Stripe is 111028, AfterPay is 111027
