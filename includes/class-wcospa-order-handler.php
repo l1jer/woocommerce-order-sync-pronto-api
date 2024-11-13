@@ -17,11 +17,11 @@ class WCOSPA_Order_Handler
         $response = WCOSPA_API_Client::sync_order($order_id);
 
         if (is_wp_error($response)) {
-            error_log('Order sync failed: '.$response->get_error_message());
+            error_log('Order sync failed: ' . $response->get_error_message());
         } else {
             $order = wc_get_order($order_id);
             $order->update_status('wc-pronto-received', 'Order marked as Pronto Received after successful API sync.');
-            error_log('Order '.$order_id.' updated to Pronto Received by API sync.');
+            error_log('Order ' . $order_id . ' updated to Pronto Received by API sync.');
         }
     }
 }
@@ -38,8 +38,8 @@ class WCOSPA_Order_Sync_Button
 
     public static function enqueue_sync_button_script()
     {
-        wp_enqueue_script('wcospa-admin', WCOSPA_URL.'assets/js/wcospa-admin.js', ['jquery'], WCOSPA_VERSION, true);
-        wp_enqueue_style('wcospa-admin-style', WCOSPA_URL.'assets/css/wcospa-admin.css', [], WCOSPA_VERSION);
+        wp_enqueue_script('wcospa-admin', WCOSPA_URL . 'assets/js/wcospa-admin.js', ['jquery'], WCOSPA_VERSION, true);
+        wp_enqueue_style('wcospa-admin-style', WCOSPA_URL . 'assets/css/wcospa-admin.css', [], WCOSPA_VERSION);
     }
 
     public static function handle_ajax_sync()
@@ -131,12 +131,12 @@ class WCOSPA_Admin_Orders_Column
             echo '<div class="wcospa-order-column">';
             echo '<div class="wcospa-sync-fetch-buttons" style="justify-content: flex-end; width: 100%;">';
             echo '<button class="button wc-action-button wc-action-button-fetch fetch-order-button"
-                      data-order-id="'.esc_attr($post_id).'"
-                      data-nonce="'.esc_attr(wp_create_nonce('wcospa_fetch_order_nonce')).'"
-                      '.disabled($fetch_disabled, true, false).'>'.esc_html($fetch_button_text).'</button>';
+                      data-order-id="' . esc_attr($post_id) . '"
+                      data-nonce="' . esc_attr(wp_create_nonce('wcospa_fetch_order_nonce')) . '"
+                      ' . disabled($fetch_disabled, true, false) . '>' . esc_html($fetch_button_text) . '</button>';
             echo '</div>';
             if ($pronto_order_number) {
-                echo '<div class="pronto-order-number">'.esc_html($pronto_order_number).'</div>';
+                echo '<div class="pronto-order-number">' . esc_html($pronto_order_number) . '</div>';
             } else {
                 echo '<div class="pronto-order-number"></div>';
             }
@@ -146,8 +146,8 @@ class WCOSPA_Admin_Orders_Column
 
     public static function enqueue_admin_styles_and_scripts()
     {
-        wp_enqueue_style('wcospa-admin-style', WCOSPA_URL.'assets/css/wcospa-admin.css', [], WCOSPA_VERSION);
-        wp_enqueue_script('wcospa-admin', WCOSPA_URL.'assets/js/wcospa-admin.js', ['jquery'], WCOSPA_VERSION, true);
+        wp_enqueue_style('wcospa-admin-style', WCOSPA_URL . 'assets/css/wcospa-admin.css', [], WCOSPA_VERSION);
+        wp_enqueue_script('wcospa-admin', WCOSPA_URL . 'assets/js/wcospa-admin.js', ['jquery'], WCOSPA_VERSION, true);
     }
 }
 
@@ -164,16 +164,16 @@ class WCOSPA_Order_Data_Formatter
         $customer_provided_note = $order->get_customer_note();
 
         // Combine delivery instructions
-        $delivery_instructions = '*NO INVOICE AND PACKING SLIP* '.
-        ($billing_email !== $shipping_email && $shipping_email ? $shipping_email."\n" : $billing_email."\n").
-        (!empty($customer_provided_note) ? ' '.$customer_provided_note : '');
+        $delivery_instructions = '*NO INVOICE AND PACKING SLIP* ' .
+            ($billing_email !== $shipping_email && $shipping_email ? $shipping_email . "\n" : $billing_email . "\n") .
+            (!empty($customer_provided_note) ? ' ' . $customer_provided_note : '');
 
-        // Get business name (assuming it's stored as _shipping_company in the order)
-        $business_name = $order->get_meta('_shipping_company');
+        // Get business name using the recommended WooCommerce getter method
+        $business_name = $order->get_shipping_company();
 
         // Determine delivery address based on the conditions
         $delivery_address = [
-            'address1' => strtoupper($order->get_shipping_first_name().' '.$order->get_shipping_last_name()),
+            'address1' => strtoupper($order->get_shipping_first_name() . ' ' . $order->get_shipping_last_name()),
             'address2' => '',
             'address3' => '',
             'address4' => '',
@@ -182,31 +182,13 @@ class WCOSPA_Order_Data_Formatter
             'phone' => $order->get_billing_phone(),
         ];
 
-        // Apply the conditions to modify the delivery address
-        if (empty($business_name) && empty($shipping_address['address_2'])) {
-            // 1. No business name and no 2nd address line
-            $delivery_address['address2'] = $shipping_address['address_1'];
-            $delivery_address['address3'] = $shipping_address['city'].' '.$shipping_address['state'];
-        } elseif (empty($business_name) && !empty($shipping_address['address_2'])) {
-            // 2. No business name, but 2nd address line exists
-            $delivery_address['address2'] = $shipping_address['address_1'];
-            $delivery_address['address3'] = $shipping_address['address_2'];
-            $delivery_address['address4'] = $shipping_address['city'].' '.$shipping_address['state'];
-        } elseif (!empty($business_name) && empty($shipping_address['address_2'])) {
-            // 3. Business name exists, but no 2nd address line
-            $delivery_address['address2'] = $business_name;
-            $delivery_address['address3'] = $shipping_address['address_1'];
-            $delivery_address['address4'] = $shipping_address['city'].' '.$shipping_address['state'];
-        } elseif (!empty($business_name) && !empty($shipping_address['address_2'])) {
-            // 4. Both business name and 2nd address line exist
-            $delivery_address['address2'] = $business_name;
-            $delivery_address['address3'] = $shipping_address['address_1'];
-            $delivery_address['address4'] = $shipping_address['address_2'];
-            $delivery_address['address5'] = $shipping_address['city'].' '.$shipping_address['state'];
-        }
-
         // Get payment method from the order
         $payment_method = $order->get_payment_method();
+
+        // Calculate total price_inc_tax for all items
+        $total_price_inc_tax = array_reduce($order->get_items(), function ($total, $item) {
+            return $total + $item->get_total();
+        }, 0);
 
         // Return the formatted order data
         return [
@@ -217,7 +199,7 @@ class WCOSPA_Order_Data_Formatter
             'payment' => [
                 'method' => self::convert_payment_method($payment_method),
                 'reference' => $order->get_transaction_id(),
-                'amount' => $order->get_total(),
+                'amount' => round($total_price_inc_tax, 2),
                 'currency_code' => $order->get_currency(),
                 'bank_code' => self::get_bank_code($payment_method),
             ],
@@ -227,7 +209,7 @@ class WCOSPA_Order_Data_Formatter
 
     private static function convert_payment_method($method)
     {
-        WCOSPA_API_Client::log('Order payment method: '.$method);
+        WCOSPA_API_Client::log('Order payment method: ' . $method);
 
         // Correct payment method mapping
         $payment_mapping = [
@@ -238,7 +220,7 @@ class WCOSPA_Order_Data_Formatter
 
         // Check if the payment method exists in the mapping
         if (!isset($payment_mapping[$method])) {
-            WCOSPA_API_Client::log('Payment method not found in mapping: '.$method);
+            WCOSPA_API_Client::log('Payment method not found in mapping: ' . $method);
         }
 
         return $payment_mapping[$method] ?? 'CC'; // Return the mapped method or 'CC'
@@ -262,11 +244,36 @@ class WCOSPA_Order_Data_Formatter
     private static function format_order_items($items, $payment_method, $order)
     {
         $formatted_items = [];
+        $total_price_inc_tax = 0;
 
-        // Check if there are discounts to add a note line
+        // Process regular items in the order
+        foreach ($items as $item_id => $item) {
+            $product = $item->get_product();
+            if (!$product || !$product->get_sku()) {
+                error_log('Product or SKU not found for item ID: ' . $item_id);
+                continue;
+            }
+
+            // Calculate price_inc_tax per item (single unit price including tax)
+            $price_inc_tax_per_item = $item->get_total() / $item->get_quantity();
+            $price_ex_tax_per_item = $price_inc_tax_per_item / 1.1; // Calculate price excluding tax per unit
+
+            // Add the formatted item to the list
+            $formatted_items[] = [
+                'type' => 'SN',
+                'item_code' => $product->get_sku(),
+                'quantity' => (string) $item->get_quantity(),
+                'uom' => 'EA',
+                'price_inc_tax' => (string) round($price_inc_tax_per_item, 2),
+                'price_ex_tax' => (string) round($price_ex_tax_per_item, 2),
+            ];
+
+            // Accumulate total including tax for all items
+            $total_price_inc_tax += $item->get_total();
+        }
+
+        // Add the discount note after all product items
         $discount_note = self::get_discount_note($order);
-
-        // If there is a discount note, add it as a separate line item
         if (!empty($discount_note)) {
             $formatted_items[] = [
                 'type' => 'DN',
@@ -275,27 +282,6 @@ class WCOSPA_Order_Data_Formatter
                 'quantity' => '0',
                 'uom' => '',
                 'price_inc_tax' => '0',
-            ];
-        }
-
-        // Process regular items in the order
-        foreach ($items as $item_id => $item) {
-            $product = $item->get_product();
-            if (!$product || !$product->get_sku()) {
-                error_log('Product or SKU not found for item ID: '.$item_id);
-                continue;
-            }
-
-            // Calculate the price excluding tax
-            $price_ex_tax = $item->get_total() / 1.1;
-
-            // Add the formatted item to the list
-            $formatted_items[] = [
-                'type' => 'SN',
-                'item_code' => $product->get_sku(),
-                'quantity' => (string) $item->get_quantity(),
-                'uom' => 'EA',
-                'price_inc_tax' => (string) round($price_ex_tax, 2),
             ];
         }
 
@@ -336,7 +322,7 @@ class WCOSPA_Order_Data_Formatter
         if ($coupons = $order->get_coupon_codes()) {
             foreach ($coupons as $coupon_code) {
                 $coupon = new WC_Coupon($coupon_code);
-                $note_parts[] = 'Discount: Coupon('.$coupon_code.') - '.$coupon->get_description();
+                $note_parts[] = 'Discount: Coupon(' . $coupon_code . ') - ' . $coupon->get_description();
             }
         }
 
@@ -344,7 +330,7 @@ class WCOSPA_Order_Data_Formatter
         foreach ($order->get_items() as $item) {
             $product = $item->get_product();
             if ($product && $product->is_on_sale()) {
-                $note_parts[] = 'Product SKU: '.$product->get_sku().' is on sale';
+                $note_parts[] = 'Product SKU: ' . $product->get_sku() . ' is on sale';
             }
         }
 
@@ -356,7 +342,6 @@ class WCOSPA_Order_Data_Formatter
         return implode('; ', $note_parts);
     }
 }
-
 
 function register_pronto_received_order_status()
 {
