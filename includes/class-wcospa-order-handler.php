@@ -163,7 +163,6 @@ class WCOSPA_Order_Data_Formatter
         $shipping_email = $order->get_meta('_shipping_email');
         $customer_provided_note = $order->get_customer_note();
 
-
         // Combine delivery instructions
         $delivery_instructions = '*NO INVOICE AND PACKING SLIP* '.
         ($billing_email !== $shipping_email && $shipping_email ? $shipping_email."\n" : $billing_email."\n").
@@ -222,7 +221,7 @@ class WCOSPA_Order_Data_Formatter
                 'currency_code' => $order->get_currency(),
                 'bank_code' => self::get_bank_code($payment_method),
             ],
-            'lines' => self::format_order_items($order->get_items(), $payment_method),
+            'lines' => self::format_order_items($order->get_items(), $payment_method, $order),
         ];
     }
 
@@ -260,11 +259,13 @@ class WCOSPA_Order_Data_Formatter
         }
     }
 
-    private static function format_order_items($items, $payment_method)
+    private static function format_order_items($items, $payment_method, $order)
     {
         $formatted_items = [];
+
         // Check if there are discounts to add a note line
-        $discount_note = self::get_discount_note();
+        $discount_note = self::get_discount_note($order);
+
         // If there is a discount note, add it as a separate line item
         if (!empty($discount_note)) {
             $formatted_items[] = [
@@ -275,9 +276,9 @@ class WCOSPA_Order_Data_Formatter
                 'uom' => '',
                 'price_inc_tax' => '0',
             ];
-    }
+        }
 
-    // Process regular items in the order
+        // Process regular items in the order
         foreach ($items as $item_id => $item) {
             $product = $item->get_product();
             if (!$product || !$product->get_sku()) {
@@ -325,39 +326,37 @@ class WCOSPA_Order_Data_Formatter
 
         return $formatted_items;
     }
+
     // Helper method to generate the discount note based on order discounts
-private static function get_discount_note()
-{
-    $order = wc_get_order(get_the_ID());
-    $note_parts = [];
+    private static function get_discount_note($order)
+    {
+        $note_parts = [];
 
-    // Check for coupons applied to the order
-    if ($coupons = $order->get_coupon_codes()) {
-        foreach ($coupons as $coupon_code) {
-            $coupon = new WC_Coupon($coupon_code);
-            $note_parts[] = 'Discount: Coupon('.$coupon_code.') - '.$coupon->get_description();
+        // Check for coupons applied to the order
+        if ($coupons = $order->get_coupon_codes()) {
+            foreach ($coupons as $coupon_code) {
+                $coupon = new WC_Coupon($coupon_code);
+                $note_parts[] = 'Discount: Coupon('.$coupon_code.') - '.$coupon->get_description();
+            }
         }
-    }
 
-    // Check for on sale products
-    foreach ($order->get_items() as $item) {
-        $product = $item->get_product();
-        if ($product && $product->is_on_sale()) {
-            $note_parts[] = 'Product SKU: '.$product->get_sku().' is on sale';
+        // Check for on sale products
+        foreach ($order->get_items() as $item) {
+            $product = $item->get_product();
+            if ($product && $product->is_on_sale()) {
+                $note_parts[] = 'Product SKU: '.$product->get_sku().' is on sale';
+            }
         }
+
+        // Placeholder for auto-gift logic
+        // Uncomment and complete the following line if auto-gift logic is needed
+        // if ($auto_gift) { $note_parts[] = 'Auto gift included in order'; }
+
+        // Combine all note parts into a single description string
+        return implode('; ', $note_parts);
     }
-
-    // Check for auto-gifts if applicable (requires custom logic based on the plugin setup for gifts)
-    // This is a placeholder to check if auto gifts logic needs to be implemented.
-    // $auto_gift = ... // Logic for auto gift detection
-    // if ($auto_gift) {
-    //     $note_parts[] = 'Auto gift included in order';
-    // }
-
-    // Combine all note parts into a single description string
-    return implode('; ', $note_parts);
 }
-}
+
 
 function register_pronto_received_order_status()
 {
