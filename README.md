@@ -28,6 +28,9 @@ The WooCommerce Order Sync Pronto API plugin automatically syncs WooCommerce ord
 3. Configure your API credentials in the `wcospa-credentials.php` file located in `includes/`.
 
 == Changelog ==
+= 1.4.3 =
+- **Improvement:** When order has coupon code or any product on sale, add a note item in order indicates the order has coupon.
+
 
 = 1.4.2 =
 - **Improvement:** Include the bank_code in the payment section of the API when submitting an order to meet Pronto transaction requirements, as this indicates the payment method for each transaction. Without it, the accountant won’t be able to identify the appropriate payment method for each transaction.
@@ -178,27 +181,6 @@ If the transaction status is "Pending", the plugin will automatically check the 
 
 This plugin is licensed under the GPLv2 or later. For more information, see https://www.gnu.org/licenses/gpl-2.0.html.
 
-
-
-wp-content/plugins/wcospa
-│
-├── includes
-│   ├── class-wcospa-order-handler.php
-│   ├── class-wcospa-api-client.php
-│   ├── class-wcospa-order-sync-button.php
-│   ├── class-wcospa-order-data-formatter.php
-│   └── wcospa-credentials.php
-│       └── wcospa-credentials-sample.php
-│
-├── assets
-│   └── js
-│       └── wcospa-sync-button.js
-│
-├── wcospa.php
-└── uninstall.php
-
-
-This is the plugin code, please review, analyse and update the code to meet the following criteria:
 1. debtor code needs to be 210942 **DONE**
 2. status_code is 30 when order is processing **DONE but not working**
 3. status_code is 80 when order is completed **DONE but not working**
@@ -211,9 +193,9 @@ This is the plugin code, please review, analyse and update the code to meet the 
 6a. add uppercase "No invoice & packing slip" to del_inst_1
 6b. Add customer email from shipping (if different to billing email) to del_inst_2
 6c. if there is any Order Notes, add this to "delivery_instructions" -> "del_inst_3", limit to 30 characters only; if nothing in Order Notes, then leave it empty **DONE**
-7. remove price_ex_tax
-8. need a calculation each product price from woocommerce need to divided by 1.1, this is the price needs to send to API
-9. in the following part:
+1. remove price_ex_tax
+2. need a calculation each product price from woocommerce need to divided by 1.1, this is the price needs to send to API
+3. in the following part:
        'delivery_address' => [
             'address1' => $shipping_address['address_1'],
             'address2' => $shipping_address['address_2'],
@@ -226,5 +208,5 @@ then
 address1 should go with customer first name and last name, capitalised
 address2 is $shipping_address['address_1']
 address3 is $shipping_address['address_2']
-10. Add a CHECK button next to Sync to check the Pronto Order number, only activated when SYNC button clicked after 2 mins,
-11. Bank Code: 111025 is PayPal, Stripe is 111028, AfterPay is 111027
+1.  Add a CHECK button next to Sync to check the Pronto Order number, only activated when SYNC button clicked after 2 mins,
+2.  Bank Code: 111025 is PayPal, Stripe is 111028, AfterPay is 111027
