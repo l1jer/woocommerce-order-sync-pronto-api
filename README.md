@@ -189,33 +189,3 @@ If the transaction status is "Pending", the plugin will automatically check the 
 == License ==
 
 This plugin is licensed under the GPLv2 or later. For more information, see https://www.gnu.org/licenses/gpl-2.0.html.
-
-1. debtor code needs to be 210942 **DONE**
-2. status_code is 30 when order is processing **DONE but not working**
-3. status_code is 80 when order is completed **DONE but not working**
-4. add sync logs, inc page and GET Pronto order number **DONE but not working**
-5. customer_reference is "order number / shipping last name", e.g. 19763 / VAN VUUREN
-6.             "delivery_instructions": {
-                "del_inst_1": "No invoice&packing slip",
-                "del_inst_2": "franzwa@brisbanewestre.com",
-                "del_inst_3": "",
-6a. add uppercase "No invoice & packing slip" to del_inst_1
-6b. Add customer email from shipping (if different to billing email) to del_inst_2
-6c. if there is any Order Notes, add this to "delivery_instructions" -> "del_inst_3", limit to 30 characters only; if nothing in Order Notes, then leave it empty **DONE**
-1. remove price_ex_tax
-2. need a calculation each product price from woocommerce need to divided by 1.1, this is the price needs to send to API
-3. in the following part:
-       'delivery_address' => [
-            'address1' => $shipping_address['address_1'],
-            'address2' => $shipping_address['address_2'],
-            'address3' => '',
-            'address4' => $shipping_address['city'],
-            'address5' => $shipping_address['state'],
-            'address6' => $shipping_address['country'],
-            'address7' => '',
-then
-address1 should go with customer first name and last name, capitalised
-address2 is $shipping_address['address_1']
-address3 is $shipping_address['address_2']
-1.  Add a CHECK button next to Sync to check the Pronto Order number, only activated when SYNC button clicked after 2 mins,
-2.  Bank Code: 111025 is PayPal, Stripe is 111028, AfterPay is 111027
