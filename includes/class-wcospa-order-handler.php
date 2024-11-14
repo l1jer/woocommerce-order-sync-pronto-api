@@ -198,7 +198,7 @@ class WCOSPA_Order_Data_Formatter
             'delivery_instructions' => $delivery_instructions,
             'payment' => [
                 'method' => self::convert_payment_method($payment_method),
-                'reference' => $order->get_transaction_id(),
+                'reference' => $customer_reference,
                 'amount' => round($total_price_inc_tax, 2),
                 'currency_code' => $order->get_currency(),
                 'bank_code' => self::get_bank_code($payment_method),
