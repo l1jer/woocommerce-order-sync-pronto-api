@@ -119,53 +119,22 @@ document.addEventListener("DOMContentLoaded", function () {
     //     });
     // });
 
-    fetchButtons.forEach(function (button) {
+    function handleFetchButton(button) {
         var orderId = button.getAttribute("data-order-id");
         var syncTime = button.getAttribute("data-sync-time");
         var nonce = button.getAttribute("data-nonce");
-        var prontoOrderDisplay = document.querySelector(
-            '.pronto-order-number[data-order-id="' + orderId + '"]'
-        );
+        var prontoOrderDisplay = document.querySelector('.pronto-order-number');
 
+        // 处理倒计时逻辑
         if (syncTime) {
-            var remainingTime = 120 - Math.floor(Date.now() / 1000 - syncTime);
-            if (remainingTime > 0) {
-                button.disabled = true;
-                var countdownInterval = setInterval(function () {
-                    if (remainingTime > 0) {
-                        button.textContent = remainingTime + "s";
-                        remainingTime--;
-                    } else {
-                        clearInterval(countdownInterval);
-                        button.textContent = "Fetch";
-                        button.disabled = false;
-                        button.title = "";
-                    }
-                }, 1000);
-            }
+            handleCountdown(button, syncTime);
         }
 
-        fetchButtons.forEach(function (button) {
-            button.addEventListener("click", function () {
-                var orderId = button.getAttribute("data-order-id");
-                var nonce = button.getAttribute("data-nonce");
-                var prontoOrderDisplay = document.querySelector('.pronto-order-number');
-
-                var xhr = new XMLHttpRequest();
-                xhr.open("POST", ajaxurl, true);
-                xhr.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
-                xhr.onload = function () {
-                    if (xhr.status === 200) {
-                        var response = JSON.parse(xhr.responseText);
-                        if (response.success) {
-                            prontoOrderDisplay.textContent = "Pronto Order Number: " + response.pronto_order_number;
-                        }
-                    }
-                };
-
-                xhr.send("action=wcospa_fetch_pronto_order&order_id=" + encodeURIComponent(orderId) + "&security=" + encodeURIComponent(nonce));
-            });
+        // 处理点击事件
+        button.addEventListener("click", function() {
+            handleFetchButtonClick(orderId, nonce, prontoOrderDisplay);
         });
+    }
 
-    });
+    fetchButtons.forEach(handleFetchButton);
 });

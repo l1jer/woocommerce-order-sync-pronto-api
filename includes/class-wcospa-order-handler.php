@@ -182,27 +182,27 @@ class WCOSPA_Order_Data_Formatter
             'phone' => $order->get_billing_phone(),
         ];
 
-                // Apply the conditions to modify the delivery address
+        // Apply the conditions to modify the delivery address
         if (empty($business_name) && empty($shipping_address['address_2'])) {
             // 1. No business name and no 2nd address line
             $delivery_address['address2'] = $shipping_address['address_1'];
-            $delivery_address['address3'] = $shipping_address['city'].' '.$shipping_address['state'];
+            $delivery_address['address3'] = $shipping_address['city'] . ' ' . $shipping_address['state'];
         } elseif (empty($business_name) && !empty($shipping_address['address_2'])) {
             // 2. No business name, but 2nd address line exists
             $delivery_address['address2'] = $shipping_address['address_1'];
             $delivery_address['address3'] = $shipping_address['address_2'];
-            $delivery_address['address4'] = $shipping_address['city'].' '.$shipping_address['state'];
+            $delivery_address['address4'] = $shipping_address['city'] . ' ' . $shipping_address['state'];
         } elseif (!empty($business_name) && empty($shipping_address['address_2'])) {
             // 3. Business name exists, but no 2nd address line
             $delivery_address['address2'] = $business_name;
             $delivery_address['address3'] = $shipping_address['address_1'];
-            $delivery_address['address4'] = $shipping_address['city'].' '.$shipping_address['state'];
+            $delivery_address['address4'] = $shipping_address['city'] . ' ' . $shipping_address['state'];
         } elseif (!empty($business_name) && !empty($shipping_address['address_2'])) {
             // 4. Both business name and 2nd address line exist
             $delivery_address['address2'] = $business_name;
             $delivery_address['address3'] = $shipping_address['address_1'];
             $delivery_address['address4'] = $shipping_address['address_2'];
-            $delivery_address['address5'] = $shipping_address['city'].' '.$shipping_address['state'];
+            $delivery_address['address5'] = $shipping_address['city'] . ' ' . $shipping_address['state'];
         }
 
         // Get payment method from the order
@@ -221,7 +221,7 @@ class WCOSPA_Order_Data_Formatter
             'delivery_instructions' => $delivery_instructions,
             'payment' => [
                 'method' => self::convert_payment_method($payment_method),
-                'reference' => ' ' .strtoupper($payment_method) . ' ' . $customer_reference,
+                'reference' => ' ' . strtoupper($payment_method) . ' ' . $customer_reference,
                 'amount' => round($total_price_inc_tax, 2),
                 'currency_code' => $order->get_currency(),
                 'bank_code' => self::get_bank_code($payment_method),
