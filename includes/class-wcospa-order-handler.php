@@ -52,8 +52,9 @@ class WCOSPA_Order_Sync_Button
 
         $order_id = intval($_POST['order_id']);
 
-        if ($already_synced) {
-            wp_send_json_error('This order has already been synced.');
+        $transaction_uuid = get_post_meta($order_id, '_wcospa_transaction_uuid', true);
+        if (!empty($transaction_uuid)) {
+            wp_send_json_error('This order has already been synchronised with Pronto.');
         }
 
         $uuid = WCOSPA_API_Client::sync_order($order_id);
