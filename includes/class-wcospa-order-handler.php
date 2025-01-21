@@ -10,6 +10,7 @@ class WCOSPA_Order_Handler
     public static function init()
     {
         add_action('woocommerce_order_status_processing', [__CLASS__, 'handle_order_sync'], 10, 1);
+        add_action('wcospa_fetch_pronto_order_number', [__CLASS__, 'scheduled_fetch_pronto_order'], 10, 1);
     }
 
     public static function handle_order_sync($order_id)
@@ -22,6 +23,32 @@ class WCOSPA_Order_Handler
             $order = wc_get_order($order_id);
             $order->update_status('wc-pronto-received', 'Order marked as Pronto Received after successful API sync.');
             error_log('Order ' . $order_id . ' updated to Pronto Received by API sync.');
+            
+            wp_schedule_single_event(time() + 120, 'wcospa_fetch_pronto_order_number', [$order_id]);
+        }
+    }
+
+    /**
+     * Scheduled task to fetch Pronto order number
+     *
+     * @param int $order_id The WooCommerce order ID
+     */
+    public static function scheduled_fetch_pronto_order($order_id)
+    {
+        // 检查是否已有 Pronto Order Number
+        $existing_number = get_post_meta($order_id, '_wcospa_pronto_order_number', true);
+        if (!empty($existing_number)) {
+            return;
+        }
+
+        // 执行 Fetch 操作
+        $pronto_order_number = WCOSPA_API_Client::fetch_order_status($order_id);
+
+        if (!is_wp_error($pronto_order_number)) {
+            update_post_meta($order_id, '_wcospa_pronto_order_number', $pronto_order_number);
+            error_log('Successfully fetched Pronto Order Number: ' . $pronto_order_number . ' for order: ' . $order_id);
+        } else {
+            error_log('Failed to fetch Pronto Order Number for order ' . $order_id . ': ' . $pronto_order_number->get_error_message());
         }
     }
 }
@@ -118,28 +145,17 @@ class WCOSPA_Admin_Orders_Column
         if ($column === 'pronto_order_number') {
             $pronto_order_number = get_post_meta($post_id, '_wcospa_pronto_order_number', true);
             $transaction_uuid = get_post_meta($post_id, '_wcospa_transaction_uuid', true);
-            $fetch_button_text = 'Fetch';
-            $fetch_disabled = true;
-
-            if ($pronto_order_number) {
-                $fetch_button_text = 'Fetched';
-                $fetch_disabled = true;
-            } else {
-                $fetch_button_text = 'Fetch';
-                $fetch_disabled = false;
-            }
 
             echo '<div class="wcospa-order-column">';
-            echo '<div class="wcospa-sync-fetch-buttons" style="justify-content: flex-end; width: 100%;">';
-            echo '<button class="button wc-action-button wc-action-button-fetch fetch-order-button"
-                      data-order-id="' . esc_attr($post_id) . '"
-                      data-nonce="' . esc_attr(wp_create_nonce('wcospa_fetch_order_nonce')) . '"
-                      ' . disabled($fetch_disabled, true, false) . '>' . esc_html($fetch_button_text) . '</button>';
-            echo '</div>';
             if ($pronto_order_number) {
+                // 如果有 Pronto Order Number，直接显示
                 echo '<div class="pronto-order-number">' . esc_html($pronto_order_number) . '</div>';
+            } elseif ($transaction_uuid) {
+                // 如果有 UUID 但还没有 Order Number，显示等待中状态
+                echo '<div class="pronto-order-number">Awaiting Pronto Order Number...</div>';
             } else {
-                echo '<div class="pronto-order-number"></div>';
+                // 如果既没有 UUID 也没有 Order Number
+                echo '<div class="pronto-order-number">Not synced</div>';
             }
             echo '</div>';
         }
