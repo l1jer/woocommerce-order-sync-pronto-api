@@ -35,13 +35,13 @@ class WCOSPA_Order_Handler
      */
     public static function scheduled_fetch_pronto_order($order_id)
     {
-        // 检查是否已有 Pronto Order Number
+        // Check if Pronto Order Number exists
         $existing_number = get_post_meta($order_id, '_wcospa_pronto_order_number', true);
         if (!empty($existing_number)) {
             return;
         }
 
-        // 执行 Fetch 操作
+        // Execute Fetch operation
         $pronto_order_number = WCOSPA_API_Client::fetch_order_status($order_id);
 
         if (!is_wp_error($pronto_order_number)) {
@@ -148,13 +148,13 @@ class WCOSPA_Admin_Orders_Column
 
             echo '<div class="wcospa-order-column">';
             if ($pronto_order_number) {
-                // 如果有 Pronto Order Number，直接显示
+                // If Pronto Order Number exists, display directly
                 echo '<div class="pronto-order-number">' . esc_html($pronto_order_number) . '</div>';
             } elseif ($transaction_uuid) {
-                // 如果有 UUID 但还没有 Order Number，显示等待中状态
+                // If UUID exists but no Order Number, display waiting status
                 echo '<div class="pronto-order-number">Awaiting Pronto Order Number...</div>';
             } else {
-                // 如果既没有 UUID 也没有 Order Number
+                // If neither UUID nor Order Number exists
                 echo '<div class="pronto-order-number">Not synced</div>';
             }
             echo '</div>';

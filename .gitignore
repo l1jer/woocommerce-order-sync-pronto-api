@@ -1,3 +1,65 @@
 .DS_Store
-Archive.zip
 includes/wcospa-credentials.php
+
+# WordPress core files
+wp-config.php
+wp-config-sample.php
+wp-content/uploads/
+wp-content/upgrade/
+wp-content/backup-db/
+wp-content/backups/
+wp-content/blogs.dir/
+wp-content/cache/
+wp-content/upgrade/
+wp-content/advanced-cache.php
+wp-content/wp-cache-config.php
+
+# WordPress debug logs
+debug.log
+*.log
+
+# Development files
+node_modules/
+vendor/
+.env
+.env.*
+!.env.example
+
+# Composer
+composer.phar
+/vendor/
+
+# Build files
+/dist/
+/build/
+
+# Package managers
+yarn-error.log
+yarn.lock
+package-lock.json
+
+# IDE and Editor folders
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Operating System files
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Temporary files
+*.tmp
+*.bak
+*.swp
+*.zip
+*.tar.gz
+
+# Testing
+phpunit.xml
+.phpunit.result.cache
+
+# WooCommerce specific
+wc-logs/

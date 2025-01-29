@@ -125,12 +125,12 @@ document.addEventListener("DOMContentLoaded", function () {
         var nonce = button.getAttribute("data-nonce");
         var prontoOrderDisplay = document.querySelector('.pronto-order-number');
 
-        // 处理倒计时逻辑
+        // Handle countdown logic
         if (syncTime) {
             handleCountdown(button, syncTime);
         }
 
-        // 处理点击事件
+        // Handle click events
         button.addEventListener("click", function() {
             handleFetchButtonClick(orderId, nonce, prontoOrderDisplay);
         });
