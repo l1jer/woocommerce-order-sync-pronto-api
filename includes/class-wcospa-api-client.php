@@ -163,55 +163,49 @@ class WCOSPA_API_Client
                 'headers' => [
                     'Authorization' => 'Basic ' . base64_encode($credentials['username'] . ':' . $credentials['password']),
                 ],
-                'timeout' => 20, // Set a timeout of 20 seconds
+                'timeout' => 20,
             ]);
 
             if (is_wp_error($response)) {
                 self::log('Fetch API request failed: ' . $response->get_error_message());
-
                 return $response;
             }
 
-            // Get the full response body as raw text (HTML)
-            $raw_body = wp_remote_retrieve_body($response);
-
-            // Log the raw HTML body for debugging (this will show the source text in the log)
-            self::log('Raw Response Body: ' . $raw_body);
-
-            // Check if the response is an HTML redirect
-            if (stripos($raw_body, '<html>') !== false) {
-                self::log('HTML response detected: ' . $raw_body);
-
-                return new WP_Error('html_response_detected', 'The API returned an HTML response.');
+            // Get the response body
+            $body = wp_remote_retrieve_body($response);
+            if (empty($body)) {
+                self::log('Empty response received from API');
+                return new WP_Error('empty_response', 'Empty response received from API');
             }
 
             // Decode the JSON response
-            $body = json_decode($raw_body, true);
-            self::log('Fetch response body (decoded): ' . print_r($body, true));
-
-            if (!isset($body['apitransactions'][0]['result_url'])) {
-                self::log('Pronto Order number not found in fetch response.');
-
-                return new WP_Error('order_number_not_found', 'Pronto Order number not found.');
+            $data = json_decode($body, true);
+            if (json_last_error() !== JSON_ERROR_NONE) {
+                self::log('Failed to decode JSON response: ' . json_last_error_msg());
+                return new WP_Error('json_decode_error', 'Failed to decode API response');
             }
 
-            // Extract the Pronto Order number from the result URL
-            $result_url = $body['apitransactions'][0]['result_url'];
-            preg_match('/number=(\d+)/', $result_url, $matches);
-            if (!isset($matches[1])) {
-                return new WP_Error('invalid_result_url', 'Invalid result URL format.');
+            // Log the raw response for debugging
+            self::log('Raw Response Body: ' . $body);
+
+            // Check if we have the required data
+            if (!isset($data['apitransactions'][0]['result_url'])) {
+                self::log('No result_url found in response');
+                return new WP_Error('no_result_url', 'No result URL found in response');
             }
-            $pronto_order_number = $matches[1];
 
-            // Store the Pronto Order number in the order meta
-            update_post_meta($order_id, '_wcospa_pronto_order_number', $pronto_order_number);
+            // Extract order number from result_url
+            if (preg_match('/number=(\d+)/', $data['apitransactions'][0]['result_url'], $matches)) {
+                $pronto_order_number = $matches[1];
+                self::log(sprintf('Successfully extracted Pronto Order Number: %s', $pronto_order_number));
+                return $pronto_order_number;
+            }
 
-            self::log('Stored Pronto Order number: ' . $pronto_order_number);
-
-            return $pronto_order_number;
+            self::log('Could not extract order number from result_url');
+            return new WP_Error('no_order_number', 'Could not extract order number from result URL');
 
         } catch (Exception $e) {
-            self::log(sprintf('Exception occurred: %s', $e->getMessage()));
+            self::log('Exception occurred: ' . $e->getMessage());
             return new WP_Error('fetch_exception', $e->getMessage());
         }
     }
