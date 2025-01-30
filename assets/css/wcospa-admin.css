@@ -17,3 +17,17 @@
     color: #999;
     font-style: italic;
 }
+
+.transaction-uuid {
+    font-family: monospace;
+    font-size: 12px;
+    color: #666;
+    word-break: break-all;
+    max-width: 200px;
+}
+
+.transaction-uuid:empty:before {
+    content: "-";
+    color: #999;
+    font-style: italic;
+}
