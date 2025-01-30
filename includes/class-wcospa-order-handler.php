@@ -24,22 +24,23 @@ if (!defined('ABSPATH')) {
  */
 class WCOSPA_Order_Handler
 {
+    const MAX_RETRY_COUNT = 5;
+    const RETRY_INTERVAL = 30; // seconds
+    const REQUEST_DELAY = 3; // seconds between requests
+    const INITIAL_WAIT = 120; // seconds to wait before first fetch
+
     public static function init()
     {
         add_action('woocommerce_order_status_processing', [__CLASS__, 'handle_order_sync'], 10, 1);
         add_action('wcospa_fetch_pronto_order_number', [__CLASS__, 'scheduled_fetch_pronto_order'], 10, 1);
         add_action('wcospa_process_pending_orders', [__CLASS__, 'process_pending_orders'], 10);
+        
+        // Schedule recurring event for processing pending orders
+        if (!wp_next_scheduled('wcospa_process_pending_orders')) {
+            wp_schedule_event(time(), 'every_three_seconds', 'wcospa_process_pending_orders');
+        }
     }
 
-    /**
-     * Handle order synchronisation with Pronto API.
-     *
-     * Processes a single order and updates its status based on the API response.
-     *
-     * @since 1.0.0
-     * @param int $order_id The WooCommerce order ID.
-     * @return void
-     */
     public static function handle_order_sync($order_id)
     {
         $response = WCOSPA_API_Client::sync_order($order_id);
@@ -99,8 +100,10 @@ class WCOSPA_Order_Handler
                 "SELECT post_id, pm1.meta_value as sync_time 
                 FROM {$wpdb->postmeta} pm1
                 JOIN {$wpdb->postmeta} pm2 ON pm1.post_id = pm2.post_id
+                JOIN {$wpdb->posts} p ON p.ID = pm1.post_id
                 WHERE pm1.meta_key = '_wcospa_sync_time'
                 AND pm2.meta_key = '_wcospa_transaction_uuid'
+                AND p.post_status = 'wc-processing'
                 AND NOT EXISTS (
                     SELECT 1 FROM {$wpdb->postmeta} pm3
                     WHERE pm3.post_id = pm1.post_id
@@ -253,6 +256,7 @@ class WCOSPA_Admin_Orders_Column
     public static function display_pronto_order_column($column, $post_id)
     {
         if ($column === 'pronto_order_number') {
+            $order = wc_get_order($post_id);
             $pronto_order_number = get_post_meta($post_id, '_wcospa_pronto_order_number', true);
             $transaction_uuid = get_post_meta($post_id, '_wcospa_transaction_uuid', true);
 
@@ -262,13 +266,19 @@ class WCOSPA_Admin_Orders_Column
                 echo '<div class="pronto-order-number">' . esc_html($pronto_order_number) . '</div>';
             } elseif ($transaction_uuid) {
                 // If UUID exists but no Order Number, display waiting status and fetch button
-                echo '<div class="pronto-order-number">Awaiting Pronto Order Number...</div>';
-                echo '<div class="wcospa-fetch-button-wrapper">';
-                echo '<button type="button" class="button fetch-order-button" data-order-id="' . esc_attr($post_id) . '" data-nonce="' . wp_create_nonce('wcospa_fetch_order_nonce') . '">Fetch</button>';
-                echo '</div>';
+                echo '<div class="pronto-order-number">Awaiting Pronto Order Number</div>';
+                if (!self::is_excluded_order($order)) {
+                    echo '<div class="wcospa-fetch-button-wrapper">';
+                    echo '<button type="button" class="button fetch-order-button" data-order-id="' . esc_attr($post_id) . '" data-nonce="' . wp_create_nonce('wcospa_fetch_order_nonce') . '">Fetch</button>';
+                    echo '</div>';
+                }
             } else {
-                // If neither UUID nor Order Number exists
-                echo '<div class="pronto-order-number">Not synced</div>';
+                // Check if order should be excluded
+                if (self::is_excluded_order($order)) {
+                    echo '<div class="pronto-order-number">Legacy Order</div>';
+                } else {
+                    echo '<div class="pronto-order-number">Not synced</div>';
+                }
             }
             echo '</div>';
         }

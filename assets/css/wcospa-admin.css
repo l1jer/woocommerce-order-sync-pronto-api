@@ -10,7 +10,7 @@
 }
 
 .pronto-order-number {
-    font-weight: 600;
+    font-weight: 400;
 }
 
 .pronto-order-number:empty:before {
