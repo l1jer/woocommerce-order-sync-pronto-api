@@ -189,15 +189,39 @@ class WCOSPA_Order_Sync_Button
         }
 
         $order_id = intval($_POST['order_id']);
-        $pronto_order_number = WCOSPA_API_Client::fetch_order_status($order_id);
 
-        if (is_wp_error($pronto_order_number)) {
-            wp_send_json_error($pronto_order_number->get_error_message());
+        // Check if we already have a Pronto order number
+        $existing_number = get_post_meta($order_id, '_wcospa_pronto_order_number', true);
+        if (!empty($existing_number)) {
+            wp_send_json_success(['pronto_order_number' => $existing_number]);
+            return;
         }
 
-        update_post_meta($order_id, '_wcospa_pronto_order_number', $pronto_order_number);
+        // Get a lock to prevent concurrent processing
+        $lock_key = '_wcospa_fetch_lock_' . $order_id;
+        $lock = get_transient($lock_key);
+        if ($lock) {
+            wp_send_json_error('Another fetch request is in progress');
+            return;
+        }
 
-        wp_send_json_success(['pronto_order_number' => $pronto_order_number]);
+        // Set a lock for 30 seconds
+        set_transient($lock_key, true, 30);
+
+        try {
+            $pronto_order_number = WCOSPA_API_Client::fetch_order_status($order_id);
+
+            if (!is_wp_error($pronto_order_number) && !empty($pronto_order_number)) {
+                update_post_meta($order_id, '_wcospa_pronto_order_number', $pronto_order_number);
+                wp_send_json_success(['pronto_order_number' => $pronto_order_number]);
+            } else {
+                $error_message = is_wp_error($pronto_order_number) ? $pronto_order_number->get_error_message() : 'Failed to fetch order number';
+                wp_send_json_error($error_message);
+            }
+        } finally {
+            // Always remove the lock
+            delete_transient($lock_key);
+        }
     }
 }
 
