@@ -86,3 +86,10 @@ Key Conventions
 8. Use WordPress's hook system for modular and extensible code.
 9. Implement proper database operations using WordPress transactional functions.
 10. Use WordPress's WP_Cron API for scheduling tasks.
+11. Language and Style Guidelines:
+    - Use British/Australian English for all code, comments, and documentation
+    - Follow British/Australian English spelling, grammar, and formatting conventions
+    - Write in standard technical English for clarity and precision
+    - Avoid non-English languages (including Chinese) in code and comments, except for explanations and responses which should be in Chinese
+    - Include comprehensive debugging statements and technical comments
+    - Use yarn as the package manager (not npm)
