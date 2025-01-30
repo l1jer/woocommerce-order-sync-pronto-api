@@ -58,14 +58,29 @@ class WCOSPA_API_Client
         // Extract the Transaction UUID from the apitransactions array
         if (isset($body['apitransactions'][0]['uuid'])) {
             $transaction_uuid = $body['apitransactions'][0]['uuid'];
-            update_post_meta($order_id, '_wcospa_transaction_uuid', $transaction_uuid);
-            WCOSPA_API_Client::log('Stored Transaction UUID: ' . $transaction_uuid);
+            
+            // Store the UUID in order meta
+            $updated = update_post_meta($order_id, '_wcospa_transaction_uuid', $transaction_uuid);
+            
+            if ($updated) {
+                WCOSPA_API_Client::log('Successfully stored Transaction UUID: ' . $transaction_uuid . ' for order ' . $order_id);
+            } else {
+                WCOSPA_API_Client::log('Failed to store Transaction UUID: ' . $transaction_uuid . ' for order ' . $order_id);
+            }
+
+            // Log the full transaction details for debugging
+            WCOSPA_API_Client::log('Transaction Details: ' . print_r([
+                'uuid' => $transaction_uuid,
+                'status' => $body['apitransactions'][0]['status'] ?? 'Unknown',
+                'errors' => $body['apitransactions'][0]['errors'] ?? null,
+                'warnings' => $body['apitransactions'][0]['warnings'] ?? null,
+                'result_url' => $body['apitransactions'][0]['result_url'] ?? null
+            ], true));
 
             return $transaction_uuid;
         } else {
-            WCOSPA_API_Client::log('Transaction UUID not found in sync response.');
-
-            return new WP_Error('uuid_not_found', 'Transaction UUID not found.');
+            WCOSPA_API_Client::log('Transaction UUID not found in sync response. Response structure: ' . print_r($body, true));
+            return new WP_Error('uuid_not_found', 'Transaction UUID not found in API response.');
         }
     }
 
