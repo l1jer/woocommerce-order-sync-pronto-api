@@ -211,8 +211,11 @@ class WCOSPA_Admin_Orders_Column
                 // If Pronto Order Number exists, display directly
                 echo '<div class="pronto-order-number">' . esc_html($pronto_order_number) . '</div>';
             } elseif ($transaction_uuid) {
-                // If UUID exists but no Order Number, display waiting status
+                // If UUID exists but no Order Number, display waiting status and fetch button
                 echo '<div class="pronto-order-number">Awaiting Pronto Order Number...</div>';
+                echo '<div class="wcospa-fetch-button-wrapper">';
+                echo '<button type="button" class="button fetch-order-button" data-order-id="' . esc_attr($post_id) . '" data-nonce="' . wp_create_nonce('wcospa_fetch_order_nonce') . '">Fetch</button>';
+                echo '</div>';
             } else {
                 // If neither UUID nor Order Number exists
                 echo '<div class="pronto-order-number">Not synced</div>';

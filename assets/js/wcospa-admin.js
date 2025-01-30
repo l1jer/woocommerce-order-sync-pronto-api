@@ -56,4 +56,57 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     fetchButtons.forEach(handleFetchButton);
+
+    // Handle Fetch Order buttons
+    document.querySelectorAll('.fetch-order-button').forEach(function(button) {
+        button.addEventListener('click', function() {
+            if (button.classList.contains('loading')) {
+                return;
+            }
+
+            const orderId = button.getAttribute('data-order-id');
+            const nonce = button.getAttribute('data-nonce');
+            const orderColumn = button.closest('.wcospa-order-column');
+            const orderNumberDiv = orderColumn.querySelector('.pronto-order-number');
+
+            // Add loading state
+            button.classList.add('loading');
+            button.disabled = true;
+            orderNumberDiv.textContent = 'Fetching...';
+
+            // Prepare form data
+            const formData = new FormData();
+            formData.append('action', 'wcospa_fetch_pronto_order');
+            formData.append('order_id', orderId);
+            formData.append('security', nonce);
+
+            // Make the AJAX request
+            fetch(ajaxurl, {
+                method: 'POST',
+                body: formData,
+                credentials: 'same-origin'
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Update the order number display
+                    orderNumberDiv.textContent = data.data.pronto_order_number;
+                    // Remove the fetch button as it's no longer needed
+                    button.closest('.wcospa-fetch-button-wrapper').remove();
+                } else {
+                    // Show error in the order number div
+                    orderNumberDiv.textContent = 'Fetch failed. Try again.';
+                    // Remove loading state
+                    button.classList.remove('loading');
+                    button.disabled = false;
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                orderNumberDiv.textContent = 'Fetch failed. Try again.';
+                button.classList.remove('loading');
+                button.disabled = false;
+            });
+        });
+    });
 });
