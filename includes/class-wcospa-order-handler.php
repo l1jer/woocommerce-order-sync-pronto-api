@@ -1,27 +1,10 @@
 <?php
-/**
- * Order Handler Class
- *
- * Handles the core functionality of order synchronisation with Pronto API.
- * This includes order status management, API sync scheduling, and metadata handling.
- *
- * @package    WooCommerce Order Sync Pronto API
- * @subpackage Handlers
- * @since      1.0.0
- */
 
 // This file handles WooCommerce order processing and syncing with the API
 if (!defined('ABSPATH')) {
     exit;
 }
 
-/**
- * WCOSPA_Order_Handler Class
- *
- * Manages WooCommerce order processing and synchronisation with Pronto API.
- *
- * @since 1.0.0
- */
 class WCOSPA_Order_Handler
 {
     const MAX_RETRY_COUNT = 5;
@@ -29,20 +12,29 @@ class WCOSPA_Order_Handler
     const REQUEST_DELAY = 3; // seconds between requests
     const INITIAL_WAIT = 120; // seconds to wait before first fetch
 
+    // Define excluded order statuses
+    private static $excluded_statuses = [
+        'wc-shipped',
+        'wc-delivered',
+        'wc-cancelled',
+        'wc-on-hold',
+        'wc-completed',
+        'wc-refunded',
+        'wc-failed'
+    ];
+
     public static function init()
     {
         add_action('woocommerce_order_status_processing', [__CLASS__, 'handle_order_sync'], 10, 1);
-        add_action('wcospa_fetch_pronto_order_number', [__CLASS__, 'scheduled_fetch_pronto_order'], 10, 1);
+        add_action('wcospa_fetch_pronto_order_number', [__CLASS__, 'scheduled_fetch_pronto_order'], 10, 2);
         add_action('wcospa_process_pending_orders', [__CLASS__, 'process_pending_orders'], 10);
         
         // Schedule recurring event for processing pending orders
         if (!wp_next_scheduled('wcospa_process_pending_orders')) {
-            wp_schedule_event(time(), 'every_1_minutes', 'wcospa_process_pending_orders');
+            wp_schedule_event(time(), 'every_three_seconds', 'wcospa_process_pending_orders');
         }
     }
 
-<<<<<<< HEAD
-=======
     /**
      * Check if order status is excluded from processing
      *
@@ -80,7 +72,7 @@ class WCOSPA_Order_Handler
         
         // Schedule the recurring event
         if (!wp_next_scheduled('wcospa_process_pending_orders')) {
-            wp_schedule_event(time(), 'every_1_minutes', 'wcospa_process_pending_orders');
+            wp_schedule_event(time(), 'every_three_seconds', 'wcospa_process_pending_orders');
         }
     }
 
@@ -98,7 +90,6 @@ class WCOSPA_Order_Handler
         // Do NOT remove wcospa_first_activation_time to maintain historical reference
     }
 
->>>>>>> 6280320 (Refactor order processing and shipment tracking)
     public static function handle_order_sync($order_id)
     {
         $response = WCOSPA_API_Client::sync_order($order_id);
@@ -109,7 +100,7 @@ class WCOSPA_Order_Handler
             $order = wc_get_order($order_id);
             $order->update_status('wc-pronto-received', 'Order marked as Pronto Received after successful API sync.');
             
-            // Store transaction UUID and sync time
+            // Store transaction UUID, sync time and initial retry count
             update_post_meta($order_id, '_wcospa_transaction_uuid', $response);
             update_post_meta($order_id, '_wcospa_sync_time', time());
             update_post_meta($order_id, '_wcospa_fetch_retry_count', 0);
@@ -125,24 +116,34 @@ class WCOSPA_Order_Handler
      * Scheduled task to fetch Pronto order number
      *
      * @param int $order_id The WooCommerce order ID
+     * @param int $attempt Current attempt number
      */
-    public static function scheduled_fetch_pronto_order($order_id)
+    public static function scheduled_fetch_pronto_order($order_id, $attempt = 1)
     {
-        // Check if Pronto Order Number exists
+        // Check if Pronto Order Number already exists
         $existing_number = get_post_meta($order_id, '_wcospa_pronto_order_number', true);
         if (!empty($existing_number)) {
+            error_log("Order {$order_id} already has Pronto Order Number: {$existing_number}");
+            return;
+        }
+
+        // Get retry count
+        $retry_count = (int) get_post_meta($order_id, '_wcospa_fetch_retry_count', true);
+        
+        // Check if we've exceeded max retries
+        if ($retry_count >= self::MAX_RETRY_COUNT) {
+            error_log("Order {$order_id} exceeded maximum retry attempts ({$retry_count})");
             return;
         }
 
         // Execute Fetch operation
         $pronto_order_number = WCOSPA_API_Client::fetch_order_status($order_id);
 
-        if (!is_wp_error($pronto_order_number)) {
+        if (!is_wp_error($pronto_order_number) && !empty($pronto_order_number)) {
+            // Success! Store the order number
             update_post_meta($order_id, '_wcospa_pronto_order_number', $pronto_order_number);
             delete_post_meta($order_id, '_wcospa_fetch_retry_count'); // Clean up retry count
             error_log("Successfully fetched Pronto Order Number: {$pronto_order_number} for order: {$order_id} on attempt {$attempt}");
-<<<<<<< HEAD
-=======
             
             // Trigger shipment tracking process
             do_action('wcospa_pronto_order_number_received', $order_id, $pronto_order_number);
@@ -160,9 +161,19 @@ class WCOSPA_Order_Handler
                 
                 error_log("Successfully fetched Shipment Number: {$shipment_number} for order: {$order_id}");
             }
->>>>>>> 6280320 (Refactor order processing and shipment tracking)
         } else {
-            error_log('Failed to fetch Pronto Order Number for order ' . $order_id . ': ' . $pronto_order_number->get_error_message());
+            // Failed attempt - increment retry count and schedule next attempt if needed
+            $retry_count++;
+            update_post_meta($order_id, '_wcospa_fetch_retry_count', $retry_count);
+            
+            if ($retry_count < self::MAX_RETRY_COUNT) {
+                // Calculate delay for next attempt (includes 3-second spacing between orders)
+                $next_attempt_delay = self::RETRY_INTERVAL + (self::REQUEST_DELAY * ($order_id % 10));
+                wp_schedule_single_event(time() + $next_attempt_delay, 'wcospa_fetch_pronto_order_number', [$order_id, $retry_count + 1]);
+                error_log("Scheduled retry #{$retry_count} for order {$order_id} in {$next_attempt_delay} seconds");
+            } else {
+                error_log("Failed to fetch Pronto Order Number for order {$order_id} after {$retry_count} attempts");
+            }
         }
     }
 
@@ -173,7 +184,7 @@ class WCOSPA_Order_Handler
     {
         global $wpdb;
 
-        // Get orders that were synced more than 120 seconds ago but don't have a Pronto order number
+        // Get orders that were synced but don't have a Pronto order number
         $pending_orders = $wpdb->get_results(
             $wpdb->prepare(
                 "SELECT post_id, pm1.meta_value as sync_time 
@@ -204,19 +215,18 @@ class WCOSPA_Order_Handler
             return;
         }
 
-        // Process one order at a time
-        $order_id = $pending_orders[0]->post_id;
-        $transaction_uuid = get_post_meta($order_id, '_wcospa_transaction_uuid', true);
-
-        if (empty($transaction_uuid)) {
-            return;
-        }
-
-        $pronto_order_number = WCOSPA_API_Client::fetch_order_status($order_id);
-
-        if (!is_wp_error($pronto_order_number) && !empty($pronto_order_number)) {
-            update_post_meta($order_id, '_wcospa_pronto_order_number', $pronto_order_number);
-            error_log('Successfully fetched Pronto Order Number: ' . $pronto_order_number . ' for order: ' . $order_id);
+        // Process orders with delay between each
+        foreach ($pending_orders as $index => $order) {
+            $sync_time = (int) $order->sync_time;
+            $current_time = time();
+            
+            // Check if initial wait period has passed
+            if ($current_time - $sync_time >= self::INITIAL_WAIT) {
+                // Schedule with staggered delays to prevent API overload
+                $delay = self::REQUEST_DELAY * $index;
+                wp_schedule_single_event(time() + $delay, 'wcospa_fetch_pronto_order_number', [$order->post_id, 1]);
+                error_log("Scheduled fetch for order {$order->post_id} with {$delay}s delay");
+            }
         }
     }
 }
@@ -365,12 +375,12 @@ class WCOSPA_Admin_Orders_Column
 {
     public static function init()
     {
-        add_filter('manage_edit-shop_order_columns', [__CLASS__, 'add_pronto_order_column']);
-        add_action('manage_shop_order_posts_custom_column', [__CLASS__, 'display_pronto_order_column'], 10, 2);
+        add_filter('manage_edit-shop_order_columns', [__CLASS__, 'add_order_columns']);
+        add_action('manage_shop_order_posts_custom_column', [__CLASS__, 'display_order_columns'], 10, 2);
         add_action('admin_enqueue_scripts', [__CLASS__, 'enqueue_admin_styles_and_scripts']);
     }
 
-    public static function add_pronto_order_column($columns)
+    public static function add_order_columns($columns)
     {
         $new_columns = [];
 
@@ -378,6 +388,7 @@ class WCOSPA_Admin_Orders_Column
             $new_columns[$key] = $value;
             if ($key === 'order_total') {
                 $new_columns['pronto_order_number'] = __('Pronto Order', 'wcospa');
+                $new_columns['shipment_number'] = __('Shipment', 'wcospa');
                 $new_columns['transaction_uuid'] = __('TranUuid', 'wcospa');
             }
         }
@@ -385,7 +396,7 @@ class WCOSPA_Admin_Orders_Column
         return $new_columns;
     }
 
-    public static function display_pronto_order_column($column, $post_id)
+    public static function display_order_columns($column, $post_id)
     {
         if ($column === 'pronto_order_number') {
             $order = wc_get_order($post_id);
@@ -411,6 +422,25 @@ class WCOSPA_Admin_Orders_Column
                 } else {
                     echo '<div class="pronto-order-number">Not synced</div>';
                 }
+            }
+            echo '</div>';
+        } elseif ($column === 'shipment_number') {
+            $order = wc_get_order($post_id);
+            $shipment_number = get_post_meta($post_id, '_wcospa_shipment_number', true);
+            $pronto_order_number = get_post_meta($post_id, '_wcospa_pronto_order_number', true);
+
+            echo '<div class="wcospa-order-column">';
+            if ($shipment_number) {
+                echo '<div class="shipment-number">' . esc_html($shipment_number) . '</div>';
+            } elseif ($pronto_order_number) {
+                echo '<div class="shipment-number">Awaiting Shipment Number</div>';
+                if (!WCOSPA_Order_Handler::is_excluded_order($order)) {
+                    echo '<div class="wcospa-fetch-button-wrapper">';
+                    echo '<button type="button" class="button get-shipping-button" data-order-id="' . esc_attr($post_id) . '" data-nonce="' . wp_create_nonce('wcospa_get_shipping_nonce') . '">Get Shipping</button>';
+                    echo '</div>';
+                }
+            } else {
+                echo '<div class="shipment-number">-</div>';
             }
             echo '</div>';
         } elseif ($column === 'transaction_uuid') {
@@ -660,16 +690,17 @@ function register_pronto_received_order_status()
 }
 add_action('init', 'register_pronto_received_order_status');
 
-// Add status to order statuses list
 function add_pronto_received_to_order_statuses($order_statuses)
 {
     $new_order_statuses = [];
+
     foreach ($order_statuses as $key => $status) {
         $new_order_statuses[$key] = $status;
         if ('wc-processing' === $key) {
             $new_order_statuses['wc-pronto-received'] = 'Pronto Received';
         }
     }
+
     return $new_order_statuses;
 }
 add_filter('wc_order_statuses', 'add_pronto_received_to_order_statuses');
@@ -688,9 +719,13 @@ add_action('admin_head', 'wc_custom_order_status_styles');
 // Register custom cron interval
 function register_three_second_interval($schedules)
 {
-    $schedules['every_1_minutes'] = array(
-        'interval' => 60,
-        'display' => __('Every One Minute')
+    $schedules['every_three_seconds'] = array(
+        'interval' => 3,
+        'display' => __('Every Three Seconds')
+    );
+    $schedules['every_three_minutes'] = array(
+        'interval' => 180,
+        'display' => __('Every Three Minutes')
     );
     return $schedules;
 }
