@@ -37,10 +37,68 @@ class WCOSPA_Order_Handler
         
         // Schedule recurring event for processing pending orders
         if (!wp_next_scheduled('wcospa_process_pending_orders')) {
-            wp_schedule_event(time(), 'every_three_seconds', 'wcospa_process_pending_orders');
+            wp_schedule_event(time(), 'every_1_minutes', 'wcospa_process_pending_orders');
         }
     }
 
+<<<<<<< HEAD
+=======
+    /**
+     * Check if order status is excluded from processing
+     *
+     * @param WC_Order|int $order Order object or ID
+     * @return bool True if order should be excluded
+     */
+    public static function is_excluded_order($order)
+    {
+        if (!($order instanceof WC_Order)) {
+            $order = wc_get_order($order);
+        }
+
+        if (!$order) {
+            return true;
+        }
+
+        return in_array('wc-' . $order->get_status(), self::$excluded_statuses);
+    }
+
+    /**
+     * Plugin activation handler
+     */
+    public static function activate()
+    {
+        // Store first activation time if not already set
+        if (!get_option('wcospa_first_activation_time')) {
+            update_option('wcospa_first_activation_time', time(), 'no');
+        }
+
+        // Store current activation time
+        update_option('wcospa_current_activation_time', time(), 'no');
+
+        // Clear any existing scheduled hooks
+        wp_clear_scheduled_hook('wcospa_process_pending_orders');
+        
+        // Schedule the recurring event
+        if (!wp_next_scheduled('wcospa_process_pending_orders')) {
+            wp_schedule_event(time(), 'every_1_minutes', 'wcospa_process_pending_orders');
+        }
+    }
+
+    /**
+     * Plugin deactivation handler
+     */
+    public static function deactivate()
+    {
+        // Clear scheduled hooks
+        wp_clear_scheduled_hook('wcospa_process_pending_orders');
+        
+        // Remove current activation time
+        delete_option('wcospa_current_activation_time');
+        
+        // Do NOT remove wcospa_first_activation_time to maintain historical reference
+    }
+
+>>>>>>> 6280320 (Refactor order processing and shipment tracking)
     public static function handle_order_sync($order_id)
     {
         $response = WCOSPA_API_Client::sync_order($order_id);
@@ -83,6 +141,26 @@ class WCOSPA_Order_Handler
             update_post_meta($order_id, '_wcospa_pronto_order_number', $pronto_order_number);
             delete_post_meta($order_id, '_wcospa_fetch_retry_count'); // Clean up retry count
             error_log("Successfully fetched Pronto Order Number: {$pronto_order_number} for order: {$order_id} on attempt {$attempt}");
+<<<<<<< HEAD
+=======
+            
+            // Trigger shipment tracking process
+            do_action('wcospa_pronto_order_number_received', $order_id, $pronto_order_number);
+            
+            // Fetch shipping number
+            $order_details = WCOSPA_API_Client::get_pronto_order_details($order_id);
+            if (!is_wp_error($order_details) && isset($order_details['consignment_note'])) {
+                $shipment_number = $order_details['consignment_note'];
+                
+                // Add tracking to WooCommerce order using Shipment Handler
+                WCOSPA_Shipment_Handler::add_tracking_to_order($order_id, $shipment_number);
+                
+                // Store shipment number in order meta
+                update_post_meta($order_id, '_wcospa_shipment_number', $shipment_number);
+                
+                error_log("Successfully fetched Shipment Number: {$shipment_number} for order: {$order_id}");
+            }
+>>>>>>> 6280320 (Refactor order processing and shipment tracking)
         } else {
             error_log('Failed to fetch Pronto Order Number for order ' . $order_id . ': ' . $pronto_order_number->get_error_message());
         }
@@ -262,7 +340,13 @@ class WCOSPA_Order_Sync_Button
 
             if (!is_wp_error($order_details) && isset($order_details['consignment_note'])) {
                 $shipment_number = $order_details['consignment_note'];
+                
+                // Add tracking to WooCommerce order using Shipment Handler
+                WCOSPA_Shipment_Handler::add_tracking_to_order($order_id, $shipment_number);
+                
+                // Store shipment number in order meta
                 update_post_meta($order_id, '_wcospa_shipment_number', $shipment_number);
+                
                 wp_send_json_success(['shipment_number' => $shipment_number]);
             } else {
                 $error_message = is_wp_error($order_details) ? $order_details->get_error_message() : 'Failed to fetch shipment number';
@@ -604,10 +688,10 @@ add_action('admin_head', 'wc_custom_order_status_styles');
 // Register custom cron interval
 function register_three_second_interval($schedules)
 {
-    $schedules['every_three_seconds'] = array(
-        'interval' => 3,
-        'display' => __('Every Three Seconds')
+    $schedules['every_1_minutes'] = array(
+        'interval' => 60,
+        'display' => __('Every One Minute')
     );
     return $schedules;
 }
-add_filter('cron_schedules', [__CLASS__, 'register_three_second_interval']);
+add_filter('cron_schedules', 'register_three_second_interval');
