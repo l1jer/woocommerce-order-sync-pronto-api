@@ -191,7 +191,7 @@ class WCOSPA_Order_Handler
         // Get orders that were synced but don't have a Pronto order number
         $pending_orders = $wpdb->get_results(
             $wpdb->prepare(
-                "SELECT post_id, pm1.meta_value as sync_time 
+                "SELECT pm1.post_id, pm1.meta_value as sync_time 
                 FROM {$wpdb->postmeta} pm1
                 JOIN {$wpdb->postmeta} pm2 ON pm1.post_id = pm2.post_id
                 JOIN {$wpdb->posts} p ON p.ID = pm1.post_id
