@@ -229,30 +229,38 @@ class WCOSPA_API_Client
         $order_url = $credentials['get_order'] . '?number=' . $pronto_order_number;
 
         // Log the order URL for debugging
-        WCOSPA_API_Client::log('Order URL: ' . $order_url);
+        self::log('Order URL: ' . $order_url);
 
         // Make the GET request to the API
         $response = wp_remote_get($order_url, [
             'headers' => [
                 'Authorization' => 'Basic ' . base64_encode($credentials['username'] . ':' . $credentials['password']),
             ],
-            'timeout' => 20, // Set a timeout of 20 seconds
+            'timeout' => 20,
         ]);
 
         if (is_wp_error($response)) {
-            WCOSPA_API_Client::log('Pronto Order API request failed: ' . $response->get_error_message());
-
+            self::log('Pronto Order API request failed: ' . $response->get_error_message());
             return $response;
         }
 
         $body = json_decode(wp_remote_retrieve_body($response), true);
-        WCOSPA_API_Client::log('Pronto Order response body: ' . print_r($body, true));
+        self::log('Pronto Order response body: ' . print_r($body, true));
 
-        if (empty($body)) {
-            return new WP_Error('empty_response', 'The API returned an empty response.');
+        if (empty($body) || !isset($body['orders']) || !is_array($body['orders']) || empty($body['orders'])) {
+            return new WP_Error('empty_response', 'The API returned an invalid response.');
         }
 
-        return $body; // Return the Pronto order details
+        // Get the first order from the orders array
+        $order_details = $body['orders'][0];
+
+        // Check if consignment_note exists
+        if (!isset($order_details['consignment_note'])) {
+            return new WP_Error('no_consignment_note', 'No consignment note found in order details.');
+        }
+
+        // Return just the order details instead of the whole response
+        return $order_details;
     }
 
     public static function log($message)

@@ -57,13 +57,80 @@ document.addEventListener("DOMContentLoaded", function () {
 
     fetchButtons.forEach(handleFetchButton);
 
-    // Handle Fetch Order buttons
-    document.querySelectorAll('.fetch-order-button').forEach(function(button) {
-        // Remove old event listeners if any
-        button.removeEventListener('click', handleFetchClick);
-        // Add new event listener
-        button.addEventListener('click', handleFetchClick);
-    });
+    // Function to bind event listeners to all buttons
+    function bindButtonEvents() {
+        // Bind Fetch Order buttons
+        document.querySelectorAll('.fetch-order-button').forEach(function(button) {
+            button.removeEventListener('click', handleFetchClick);
+            button.addEventListener('click', handleFetchClick);
+        });
+
+        // Bind Get Shipping buttons
+        document.querySelectorAll('.get-shipping-button').forEach(function(button) {
+            button.removeEventListener('click', handleGetShippingClick);
+            button.addEventListener('click', handleGetShippingClick);
+        });
+    }
+
+    // Initial binding
+    bindButtonEvents();
+
+    // Rebind events every 2 seconds to catch dynamically added buttons
+    setInterval(bindButtonEvents, 2000);
+
+    // Define the click handler for Get Shipping button
+    function handleGetShippingClick(e) {
+        e.preventDefault();
+        const button = this;
+        const orderId = button.getAttribute('data-order-id');
+        const nonce = button.getAttribute('data-nonce');
+        const shipmentNumberDiv = button.closest('.wcospa-order-column').querySelector('.shipment-number');
+
+        console.log('Get Shipping clicked for order:', orderId); // Debug log
+
+        // Add loading state
+        button.classList.add('loading');
+        button.disabled = true;
+        shipmentNumberDiv.textContent = 'Fetching shipment number...';
+
+        // Prepare form data
+        const formData = new FormData();
+        formData.append('action', 'wcospa_get_shipping');
+        formData.append('order_id', orderId);
+        formData.append('security', nonce);
+
+        // Make the AJAX request
+        fetch(ajaxurl, {
+            method: 'POST',
+            body: formData,
+            credentials: 'same-origin'
+        })
+        .then(response => {
+            console.log('Response received:', response); // Debug log
+            return response.json();
+        })
+        .then(data => {
+            console.log('Data received:', data); // Debug log
+            if (data.success && data.data.shipment_number) {
+                // Success! Update the display and remove the button
+                shipmentNumberDiv.textContent = data.data.shipment_number;
+                button.closest('.wcospa-fetch-button-wrapper').remove();
+            } else {
+                // Failed to fetch
+                const errorMessage = data.data || 'Failed to fetch shipment number';
+                shipmentNumberDiv.textContent = errorMessage;
+                button.classList.remove('loading');
+                button.disabled = false;
+                console.error('Fetch failed:', errorMessage); // Debug log
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            shipmentNumberDiv.textContent = 'Error fetching shipment number';
+            button.classList.remove('loading');
+            button.disabled = false;
+        });
+    }
 });
 
 // Define the click handler outside to prevent duplicates

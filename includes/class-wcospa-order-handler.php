@@ -81,7 +81,8 @@ class WCOSPA_Order_Handler
 
         if (!is_wp_error($pronto_order_number)) {
             update_post_meta($order_id, '_wcospa_pronto_order_number', $pronto_order_number);
-            error_log('Successfully fetched Pronto Order Number: ' . $pronto_order_number . ' for order: ' . $order_id);
+            delete_post_meta($order_id, '_wcospa_fetch_retry_count'); // Clean up retry count
+            error_log("Successfully fetched Pronto Order Number: {$pronto_order_number} for order: {$order_id} on attempt {$attempt}");
         } else {
             error_log('Failed to fetch Pronto Order Number for order ' . $order_id . ': ' . $pronto_order_number->get_error_message());
         }
@@ -150,6 +151,7 @@ class WCOSPA_Order_Sync_Button
         add_action('admin_footer', [__CLASS__, 'enqueue_sync_button_script']);
         add_action('wp_ajax_wcospa_sync_order', [__CLASS__, 'handle_ajax_sync']);
         add_action('wp_ajax_wcospa_fetch_pronto_order', [__CLASS__, 'handle_ajax_fetch']);
+        add_action('wp_ajax_wcospa_get_shipping', [__CLASS__, 'handle_ajax_get_shipping']);
     }
 
     public static function enqueue_sync_button_script()
@@ -226,6 +228,51 @@ class WCOSPA_Order_Sync_Button
             delete_transient($lock_key);
         }
     }
+
+    public static function handle_ajax_get_shipping()
+    {
+        check_ajax_referer('wcospa_get_shipping_nonce', 'security');
+
+        if (!isset($_POST['order_id'])) {
+            wp_send_json_error('Missing order ID');
+        }
+
+        $order_id = intval($_POST['order_id']);
+
+        // Check if we already have a shipment number
+        $existing_number = get_post_meta($order_id, '_wcospa_shipment_number', true);
+        if (!empty($existing_number)) {
+            wp_send_json_success(['shipment_number' => $existing_number]);
+            return;
+        }
+
+        // Get a lock to prevent concurrent processing
+        $lock_key = '_wcospa_shipping_lock_' . $order_id;
+        $lock = get_transient($lock_key);
+        if ($lock) {
+            wp_send_json_error('Another shipping request is in progress');
+            return;
+        }
+
+        // Set a lock for 30 seconds
+        set_transient($lock_key, true, 30);
+
+        try {
+            $order_details = WCOSPA_API_Client::get_pronto_order_details($order_id);
+
+            if (!is_wp_error($order_details) && isset($order_details['consignment_note'])) {
+                $shipment_number = $order_details['consignment_note'];
+                update_post_meta($order_id, '_wcospa_shipment_number', $shipment_number);
+                wp_send_json_success(['shipment_number' => $shipment_number]);
+            } else {
+                $error_message = is_wp_error($order_details) ? $order_details->get_error_message() : 'Failed to fetch shipment number';
+                wp_send_json_error($error_message);
+            }
+        } finally {
+            // Always remove the lock
+            delete_transient($lock_key);
+        }
+    }
 }
 
 WCOSPA_Order_Sync_Button::init();
@@ -247,6 +294,7 @@ class WCOSPA_Admin_Orders_Column
             $new_columns[$key] = $value;
             if ($key === 'order_total') {
                 $new_columns['pronto_order_number'] = __('Pronto Order', 'wcospa');
+                $new_columns['transaction_uuid'] = __('TranUuid', 'wcospa');
             }
         }
 
@@ -267,18 +315,27 @@ class WCOSPA_Admin_Orders_Column
             } elseif ($transaction_uuid) {
                 // If UUID exists but no Order Number, display waiting status and fetch button
                 echo '<div class="pronto-order-number">Awaiting Pronto Order Number</div>';
-                if (!self::is_excluded_order($order)) {
+                if (!WCOSPA_Order_Handler::is_excluded_order($order)) {
                     echo '<div class="wcospa-fetch-button-wrapper">';
                     echo '<button type="button" class="button fetch-order-button" data-order-id="' . esc_attr($post_id) . '" data-nonce="' . wp_create_nonce('wcospa_fetch_order_nonce') . '">Fetch</button>';
                     echo '</div>';
                 }
             } else {
                 // Check if order should be excluded
-                if (self::is_excluded_order($order)) {
+                if (WCOSPA_Order_Handler::is_excluded_order($order)) {
                     echo '<div class="pronto-order-number">Legacy Order</div>';
                 } else {
                     echo '<div class="pronto-order-number">Not synced</div>';
                 }
+            }
+            echo '</div>';
+        } elseif ($column === 'transaction_uuid') {
+            $transaction_uuid = get_post_meta($post_id, '_wcospa_transaction_uuid', true);
+            echo '<div class="wcospa-order-column">';
+            if ($transaction_uuid) {
+                echo '<div class="transaction-uuid">' . esc_html($transaction_uuid) . '</div>';
+            } else {
+                echo '<div class="transaction-uuid">-</div>';
             }
             echo '</div>';
         }
