@@ -150,16 +150,20 @@ class WCOSPA_Order_Handler
             
             // Fetch shipping number
             $order_details = WCOSPA_API_Client::get_pronto_order_details($order_id);
-            if (!is_wp_error($order_details) && isset($order_details['consignment_note'])) {
-                $shipment_number = $order_details['consignment_note'];
-                
-                // Add tracking to WooCommerce order using Shipment Handler
-                WCOSPA_Shipment_Handler::add_tracking_to_order($order_id, $shipment_number);
-                
-                // Store shipment number in order meta
-                update_post_meta($order_id, '_wcospa_shipment_number', $shipment_number);
-                
-                error_log("Successfully fetched Shipment Number: {$shipment_number} for order: {$order_id}");
+            if (!is_wp_error($order_details)) {
+                if (isset($order_details['consignment_note']) && !empty($order_details['consignment_note'])) {
+                    $shipment_number = $order_details['consignment_note'];
+                    
+                    // Add tracking to WooCommerce order using Shipment Handler
+                    WCOSPA_Shipment_Handler::add_tracking_to_order($order_id, $shipment_number);
+                    
+                    // Store shipment number in order meta
+                    update_post_meta($order_id, '_wcospa_shipment_number', $shipment_number);
+                    
+                    error_log("Successfully fetched Shipment Number: {$shipment_number} for order: {$order_id}");
+                } else {
+                    error_log("No valid consignment note found for order: {$order_id}");
+                }
             }
         } else {
             // Failed attempt - increment retry count and schedule next attempt if needed
@@ -348,18 +352,23 @@ class WCOSPA_Order_Sync_Button
         try {
             $order_details = WCOSPA_API_Client::get_pronto_order_details($order_id);
 
-            if (!is_wp_error($order_details) && isset($order_details['consignment_note'])) {
+            if (!is_wp_error($order_details) && isset($order_details['consignment_note']) && !empty($order_details['consignment_note'])) {
                 $shipment_number = $order_details['consignment_note'];
                 
                 // Add tracking to WooCommerce order using Shipment Handler
-                WCOSPA_Shipment_Handler::add_tracking_to_order($order_id, $shipment_number);
-                
-                // Store shipment number in order meta
-                update_post_meta($order_id, '_wcospa_shipment_number', $shipment_number);
-                
-                wp_send_json_success(['shipment_number' => $shipment_number]);
+                if (WCOSPA_Shipment_Handler::add_tracking_to_order($order_id, $shipment_number)) {
+                    // Store shipment number in order meta
+                    update_post_meta($order_id, '_wcospa_shipment_number', $shipment_number);
+                    
+                    wp_send_json_success(['shipment_number' => $shipment_number]);
+                } else {
+                    wp_send_json_error('Failed to add tracking information');
+                }
             } else {
-                $error_message = is_wp_error($order_details) ? $order_details->get_error_message() : 'Failed to fetch shipment number';
+                $error_message = is_wp_error($order_details) ? 
+                    $order_details->get_error_message() : 
+                    'No valid shipment number available yet';
+                error_log("Failed to get valid shipment number for order {$order_id}: " . $error_message);
                 wp_send_json_error($error_message);
             }
         } finally {

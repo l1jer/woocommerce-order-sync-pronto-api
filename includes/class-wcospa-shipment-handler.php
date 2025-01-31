@@ -124,6 +124,12 @@ class WCOSPA_Shipment_Handler
             return false;
         }
 
+        // Check if tracking number is valid
+        if (empty($tracking_number) || !is_string($tracking_number)) {
+            error_log("Invalid or empty tracking number for order {$order_id}");
+            return false;
+        }
+
         if (class_exists('WC_Advanced_Shipment_Tracking_Actions')) {
             $ast = WC_Advanced_Shipment_Tracking_Actions::get_instance();
             
@@ -141,6 +147,7 @@ class WCOSPA_Shipment_Handler
             // Update order status to completed
             $order->update_status('completed', 'Order completed and tracking information added.');
             
+            error_log("Successfully added tracking number {$tracking_number} to order {$order_id}");
             return true;
         }
 
