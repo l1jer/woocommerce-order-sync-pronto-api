@@ -120,6 +120,12 @@ class WCOSPA_Order_Handler
      */
     public static function scheduled_fetch_pronto_order($order_id, $attempt = 1)
     {
+        // Check if it's weekend or outside working hours
+        if (!self::is_processing_time()) {
+            error_log("Skipping Pronto order number fetch for order {$order_id} - Outside processing hours");
+            return;
+        }
+
         // Check if Pronto Order Number already exists
         $existing_number = get_post_meta($order_id, '_wcospa_pronto_order_number', true);
         if (!empty($existing_number)) {
@@ -186,6 +192,11 @@ class WCOSPA_Order_Handler
      */
     public static function process_pending_orders()
     {
+        // Skip if outside processing hours
+        if (!self::is_processing_time()) {
+            return;
+        }
+
         global $wpdb;
 
         // Get orders that were synced but don't have a Pronto order number

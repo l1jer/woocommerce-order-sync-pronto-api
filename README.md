@@ -3,7 +3,7 @@ Contributors: Jerry Li
 Tags: woocommerce, order sync, API, pronto
 Requires at least: 5.0
 Tested up to: 6.5.3
-Stable tag: 1.4.7
+Stable tag: 1.4.8
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -29,6 +29,19 @@ The WooCommerce Order Sync Pronto API plugin automatically syncs WooCommerce ord
 3. Configure your API credentials in the `wcospa-credentials.php` file located in `includes/`.
 
 == Changelog ==
+= 1.4.8 =
+
+- **Enhancement:** Added weekend processing control for Pronto order number fetching.
+  - System now skips processing during weekends (Saturday and Sunday).
+  - Processing automatically resumes at 6 AM on the next working day.
+  - Added comprehensive logging for skipped weekend processing.
+- **Bug Fix:** Fixed SQL query ambiguity with post_id field.
+  - Resolved database error in pending orders query.
+  - Improved query performance and reliability.
+- **Improvement:** Enhanced working hours management.
+  - Processing limited to 6 AM - 7 PM on weekdays.
+  - Better alignment with Pronto system operational hours.
+
 = 1.4.7 =
 
 - **Documentation:** Added comprehensive configuration documentation.
