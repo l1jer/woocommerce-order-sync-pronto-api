@@ -1,6 +1,7 @@
 .DS_Store
 includes/wcospa-credentials.php
-
+/wcospa.git/
+/wcospa.git.bfg-report/
 # WordPress core files
 wp-config.php
 wp-config-sample.php
