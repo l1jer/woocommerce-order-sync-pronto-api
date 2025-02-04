@@ -1,16 +1,14 @@
 <?php
 
-// This file handles WooCommerce order processing and syncing with the API
-if (!defined('ABSPATH')) {
-    exit;
-}
-
+/**
+ * Handles WooCommerce order processing and synchronisation with the API
+ */
 class WCOSPA_Order_Handler
 {
     const MAX_RETRY_COUNT = 5;
-    const RETRY_INTERVAL = 30; // seconds
-    const REQUEST_DELAY = 3; // seconds between requests
-    const INITIAL_WAIT = 120; // seconds to wait before first fetch
+    const RETRY_INTERVAL = 30; // seconds between retries
+    const REQUEST_DELAY = 3;   // seconds between requests
+    const INITIAL_WAIT = 120;  // seconds to wait before first fetch
 
     // Define excluded order statuses
     private static $excluded_statuses = [
@@ -23,6 +21,9 @@ class WCOSPA_Order_Handler
         'wc-failed'
     ];
 
+    /**
+     * Initialise the handler
+     */
     public static function init()
     {
         add_action('woocommerce_order_status_processing', [__CLASS__, 'handle_order_sync'], 10, 1);
@@ -90,25 +91,40 @@ class WCOSPA_Order_Handler
         // Do NOT remove wcospa_first_activation_time to maintain historical reference
     }
 
+    /**
+     * Synchronise order with Pronto API
+     *
+     * @param int $order_id The WooCommerce order ID
+     */
     public static function handle_order_sync($order_id)
     {
         $response = WCOSPA_API_Client::sync_order($order_id);
 
         if (is_wp_error($response)) {
-            error_log('Order sync failed: ' . $response->get_error_message());
+            wc_get_logger()->error(
+                sprintf('Order sync failed: %s', $response->get_error_message()),
+                ['source' => 'wcospa']
+            );
         } else {
             $order = wc_get_order($order_id);
             $order->update_status('wc-pronto-received', 'Order marked as Pronto Received after successful API sync.');
             
-            // Store transaction UUID, sync time and initial retry count
+            // Store transaction UUID and sync time
             update_post_meta($order_id, '_wcospa_transaction_uuid', $response);
             update_post_meta($order_id, '_wcospa_sync_time', time());
             update_post_meta($order_id, '_wcospa_fetch_retry_count', 0);
             
-            // Schedule the first fetch attempt after 120 seconds
-            wp_schedule_single_event(time() + self::INITIAL_WAIT, 'wcospa_fetch_pronto_order_number', [$order_id, 1]);
+            // Mark as weekend order if applicable
+            if (WCOSPA_Utils::is_weekend()) {
+                update_post_meta($order_id, '_wcospa_weekend_order', '1');
+                wc_get_logger()->info(
+                    sprintf('Order %d marked as weekend order', $order_id),
+                    ['source' => 'wcospa']
+                );
+            }
             
-            error_log('Order ' . $order_id . ' updated to Pronto Received by API sync. First fetch scheduled in ' . self::INITIAL_WAIT . ' seconds.');
+            // Schedule the first fetch attempt
+            wp_schedule_single_event(time() + self::INITIAL_WAIT, 'wcospa_fetch_pronto_order_number', [$order_id, 1]);
         }
     }
 
@@ -120,9 +136,12 @@ class WCOSPA_Order_Handler
      */
     public static function scheduled_fetch_pronto_order($order_id, $attempt = 1)
     {
-        // Check if it's weekend or outside working hours
-        if (!self::is_processing_time()) {
-            error_log("Skipping Pronto order number fetch for order {$order_id} - Outside processing hours");
+        // Check if within working hours
+        if (!WCOSPA_Utils::is_processing_time()) {
+            wc_get_logger()->debug(
+                sprintf('Skipping Pronto order fetch for order %d - Outside working hours', $order_id),
+                ['source' => 'wcospa']
+            );
             return;
         }
 
@@ -138,18 +157,31 @@ class WCOSPA_Order_Handler
         
         // Check if we've exceeded max retries
         if ($retry_count >= self::MAX_RETRY_COUNT) {
-            error_log("Order {$order_id} exceeded maximum retry attempts ({$retry_count})");
+            wc_get_logger()->debug(
+                sprintf('Order %d exceeded maximum retry attempts (%d)', $order_id, $retry_count),
+                ['source' => 'wcospa']
+            );
             return;
         }
 
         // Execute Fetch operation
         $pronto_order_number = WCOSPA_API_Client::fetch_order_status($order_id);
 
+        // Increment retry count
+        update_post_meta($order_id, '_wcospa_fetch_retry_count', $retry_count + 1);
+
         if (!is_wp_error($pronto_order_number) && !empty($pronto_order_number)) {
             // Success! Store the order number
             update_post_meta($order_id, '_wcospa_pronto_order_number', $pronto_order_number);
             delete_post_meta($order_id, '_wcospa_fetch_retry_count'); // Clean up retry count
-            error_log("Successfully fetched Pronto Order Number: {$pronto_order_number} for order: {$order_id} on attempt {$attempt}");
+            
+            wc_get_logger()->info(
+                sprintf('Successfully fetched Pronto Order Number: %s for order: %d', 
+                    $pronto_order_number, 
+                    $order_id
+                ),
+                ['source' => 'wcospa']
+            );
             
             // Trigger shipment tracking process
             do_action('wcospa_pronto_order_number_received', $order_id, $pronto_order_number);
@@ -192,23 +224,52 @@ class WCOSPA_Order_Handler
      */
     public static function process_pending_orders()
     {
-        // Skip if outside processing hours
-        if (!self::is_processing_time()) {
-            return;
-        }
-
         global $wpdb;
 
-        // Get orders that were synced but don't have a Pronto order number
-        $pending_orders = $wpdb->get_results(
+        // Special handling for Monday morning
+        if (WCOSPA_Utils::is_monday_morning()) {
+            // Get weekend orders without Pronto order numbers
+            $weekend_orders = $wpdb->get_results(
+                $wpdb->prepare(
+                    "SELECT DISTINCT o.ID as order_id
+                    FROM {$wpdb->posts} o
+                    JOIN {$wpdb->postmeta} pm1 ON o.ID = pm1.post_id AND pm1.meta_key = '_wcospa_weekend_order'
+                    JOIN {$wpdb->postmeta} pm2 ON o.ID = pm2.post_id AND pm2.meta_key = '_wcospa_transaction_uuid'
+                    WHERE o.post_type = 'shop_order'
+                    AND NOT EXISTS (
+                        SELECT 1 FROM {$wpdb->postmeta} pm3
+                        WHERE pm3.post_id = o.ID
+                        AND pm3.meta_key = '_wcospa_pronto_order_number'
+                    )
+                    ORDER BY o.ID ASC"
+                )
+            );
+
+            if (!empty($weekend_orders)) {
+                wc_get_logger()->info(
+                    sprintf('Processing %d weekend orders on Monday morning', count($weekend_orders)),
+                    ['source' => 'wcospa']
+                );
+
+                foreach ($weekend_orders as $order) {
+                    update_post_meta($order->order_id, '_wcospa_fetch_retry_count', 0);
+                    wp_schedule_single_event(
+                        time() + (self::REQUEST_DELAY * array_search($order, $weekend_orders)),
+                        'wcospa_fetch_pronto_order_number',
+                        [$order->order_id, 1]
+                    );
+                }
+            }
+        }
+
+        // Process regular (non-weekend) orders
+        $regular_orders = $wpdb->get_results(
             $wpdb->prepare(
                 "SELECT pm1.post_id, pm1.meta_value as sync_time 
                 FROM {$wpdb->postmeta} pm1
                 JOIN {$wpdb->postmeta} pm2 ON pm1.post_id = pm2.post_id
-                JOIN {$wpdb->posts} p ON p.ID = pm1.post_id
                 WHERE pm1.meta_key = '_wcospa_sync_time'
                 AND pm2.meta_key = '_wcospa_transaction_uuid'
-                AND p.post_status = 'wc-processing'
                 AND NOT EXISTS (
                     SELECT 1 FROM {$wpdb->postmeta} pm3
                     WHERE pm3.post_id = pm1.post_id
@@ -217,8 +278,13 @@ class WCOSPA_Order_Handler
                 AND NOT EXISTS (
                     SELECT 1 FROM {$wpdb->postmeta} pm4
                     WHERE pm4.post_id = pm1.post_id
-                    AND pm4.meta_key = '_wcospa_fetch_retry_count'
-                    AND pm4.meta_value >= %d
+                    AND pm4.meta_key = '_wcospa_weekend_order'
+                )
+                AND NOT EXISTS (
+                    SELECT 1 FROM {$wpdb->postmeta} pm5
+                    WHERE pm5.post_id = pm1.post_id
+                    AND pm5.meta_key = '_wcospa_fetch_retry_count'
+                    AND CAST(pm5.meta_value AS UNSIGNED) >= %d
                 )
                 ORDER BY pm1.meta_value ASC
                 LIMIT 5",
@@ -226,21 +292,67 @@ class WCOSPA_Order_Handler
             )
         );
 
-        if (empty($pending_orders)) {
-            return;
-        }
+        if (!empty($regular_orders)) {
+            foreach ($regular_orders as $index => $order) {
+                wp_schedule_single_event(
+                    time() + (self::REQUEST_DELAY * $index),
+                    'wcospa_fetch_pronto_order_number',
+                    [$order->post_id, 1]
+                );
 
-        // Process orders with delay between each
-        foreach ($pending_orders as $index => $order) {
-            $sync_time = (int) $order->sync_time;
-            $current_time = time();
+                wc_get_logger()->debug(
+                    sprintf('Scheduled fetch for order %d with %d seconds delay', 
+                        $order->post_id, 
+                        self::REQUEST_DELAY * $index
+                    ),
+                    ['source' => 'wcospa']
+                );
+            }
+        }
+    }
+
+    /**
+     * Fetch Pronto order number
+     */
+    public static function fetch_pronto_order($order_id)
+    {
+        // Get retry count
+        $retry_count = (int) get_post_meta($order_id, '_wcospa_fetch_retry_count', true);
+        $is_weekend_order = get_post_meta($order_id, '_wcospa_weekend_order', true);
+        
+        // Execute Fetch operation
+        $pronto_order_number = WCOSPA_API_Client::fetch_order_status($order_id);
+
+        if (!is_wp_error($pronto_order_number) && !empty($pronto_order_number)) {
+            // Success! Store the order number
+            update_post_meta($order_id, '_wcospa_pronto_order_number', $pronto_order_number);
+            delete_post_meta($order_id, '_wcospa_fetch_retry_count');
             
-            // Check if initial wait period has passed
-            if ($current_time - $sync_time >= self::INITIAL_WAIT) {
-                // Schedule with staggered delays to prevent API overload
-                $delay = self::REQUEST_DELAY * $index;
-                wp_schedule_single_event(time() + $delay, 'wcospa_fetch_pronto_order_number', [$order->post_id, 1]);
-                error_log("Scheduled fetch for order {$order->post_id} with {$delay}s delay");
+            // Remove weekend flag if exists
+            if ($is_weekend_order) {
+                delete_post_meta($order_id, '_wcospa_weekend_order');
+            }
+            
+            wc_get_logger()->info(
+                sprintf('Successfully fetched Pronto Order Number: %s for order: %d', 
+                    $pronto_order_number, 
+                    $order_id
+                ),
+                ['source' => 'wcospa']
+            );
+        } else {
+            // Failed attempt - increment retry count
+            $retry_count++;
+            update_post_meta($order_id, '_wcospa_fetch_retry_count', $retry_count);
+            
+            // Schedule next attempt
+            if ($is_weekend_order) {
+                // Weekend orders retry every 30 minutes
+                wp_schedule_single_event(time() + 1800, 'wcospa_fetch_pronto_order_number', [$order_id, $retry_count + 1]);
+            } else if ($retry_count < self::MAX_RETRY_COUNT) {
+                // Regular orders use normal retry interval
+                $next_attempt_delay = self::RETRY_INTERVAL + (self::REQUEST_DELAY * ($order_id % 10));
+                wp_schedule_single_event(time() + $next_attempt_delay, 'wcospa_fetch_pronto_order_number', [$order_id, $retry_count + 1]);
             }
         }
     }

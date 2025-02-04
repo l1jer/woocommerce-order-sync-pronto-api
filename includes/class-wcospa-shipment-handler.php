@@ -2,13 +2,17 @@
 
 declare(strict_types=1);
 
+/**
+ * Handles shipment tracking and processing
+ */
 class WCOSPA_Shipment_Handler
 {
     const RETRY_INTERVAL = 3600; // 1 hour in seconds
-    const MAX_TIMEOUT = 48; // 48 hours
-    const WORKING_HOURS_START = 6; // 6 AM
-    const WORKING_HOURS_END = 19; // 7 PM
+    const MAX_TIMEOUT = 48;      // 48 hours
 
+    /**
+     * Initialise the shipment handler
+     */
     public static function init()
     {
         // Schedule the cron event if not already scheduled
@@ -39,15 +43,14 @@ class WCOSPA_Shipment_Handler
      */
     public static function process_pending_shipments()
     {
-        if (!self::is_processing_time()) {
+        if (!WCOSPA_Utils::is_processing_time()) {
             return;
         }
 
         global $wpdb;
 
-        // Get orders that have Pronto order number but no shipment tracking
-        $pending_orders = $wpdb->get_results(
-            "SELECT post_id, pm1.meta_value as pronto_order_number, pm2.meta_value as tracking_start 
+        $query = $wpdb->prepare("
+            SELECT pm1.post_id, pm1.meta_value as pronto_order_number, pm2.meta_value as tracking_start 
             FROM {$wpdb->postmeta} pm1
             JOIN {$wpdb->postmeta} pm2 ON pm1.post_id = pm2.post_id
             WHERE pm1.meta_key = '_wcospa_pronto_order_number'
@@ -58,22 +61,24 @@ class WCOSPA_Shipment_Handler
                 AND pm3.meta_key = '_wcospa_shipment_number'
             )
             ORDER BY pm2.meta_value ASC
-            LIMIT 5"
-        );
+            LIMIT %d
+        ", 5);
 
-        if (empty($pending_orders)) {
+        $results = $wpdb->get_results($query);
+
+        if (empty($results)) {
             return;
         }
 
-        foreach ($pending_orders as $index => $order_data) {
+        foreach ($results as $index => $order_data) {
             // Add delay between requests
             if ($index > 0) {
                 sleep(3);
             }
 
-            $order_id = $order_id = (int) $order_data->post_id;
+            $order_id = (int) $order_data->post_id;
             $tracking_start = (int) $order_data->tracking_start;
-            $working_hours = self::calculate_working_hours($tracking_start);
+            $working_hours = WCOSPA_Utils::calculate_working_hours($tracking_start);
 
             // Check if we've exceeded the 48-hour limit
             if ($working_hours >= self::MAX_TIMEOUT) {
@@ -95,21 +100,67 @@ class WCOSPA_Shipment_Handler
             update_post_meta($order_id, '_wcospa_last_tracking_attempt', time());
 
             // Try to get shipment number
-            $order_details = WCOSPA_API_Client::get_pronto_order_details($order_id);
-            
-            if (!is_wp_error($order_details) && isset($order_details['consignment_note'])) {
-                $shipment_number = $order_details['consignment_note'];
+            self::fetch_shipment_number($order_id);
+        }
+    }
+
+    /**
+     * Fetch shipment number for an order
+     */
+    public static function fetch_shipment_number($order_id)
+    {
+        $order_details = WCOSPA_API_Client::get_pronto_order_details($order_id);
+        
+        if (!is_wp_error($order_details)) {
+            // Check status_code first
+            if (isset($order_details['status_code'])) {
+                $status_code = (string) $order_details['status_code'];
                 
-                // Add tracking to WooCommerce order
-                self::add_tracking_to_order($order_id, $shipment_number);
-                
-                // Store shipment number in order meta
-                update_post_meta($order_id, '_wcospa_shipment_number', $shipment_number);
-                
-                // Clean up tracking attempt data
-                delete_post_meta($order_id, '_wcospa_shipment_tracking_start');
-                delete_post_meta($order_id, '_wcospa_shipment_tracking_attempts');
-                delete_post_meta($order_id, '_wcospa_last_tracking_attempt');
+                // Only proceed if status_code is 80 or 90
+                if ($status_code === '80' || $status_code === '90') {
+                    if (isset($order_details['consignment_note'])) {
+                        $shipment_number = $order_details['consignment_note'];
+                        
+                        // Add tracking to WooCommerce order
+                        self::add_tracking_to_order($order_id, $shipment_number);
+                        
+                        // Store shipment number in order meta
+                        update_post_meta($order_id, '_wcospa_shipment_number', $shipment_number);
+                        
+                        // Clean up tracking attempt data
+                        delete_post_meta($order_id, '_wcospa_shipment_tracking_start');
+                        delete_post_meta($order_id, '_wcospa_shipment_tracking_attempts');
+                        delete_post_meta($order_id, '_wcospa_last_tracking_attempt');
+
+                        // Log successful tracking addition
+                        wc_get_logger()->info(
+                            sprintf('Successfully added tracking number %s to order %d with status code %s', 
+                                $shipment_number, 
+                                $order_id,
+                                $status_code
+                            ),
+                            ['source' => 'wcospa']
+                        );
+                    }
+                } else {
+                    // Log that we're waiting for correct status code
+                    wc_get_logger()->debug(
+                        sprintf('Order %d has status code %s, waiting for 80 or 90', 
+                            $order_id,
+                            $status_code
+                        ),
+                        ['source' => 'wcospa']
+                    );
+                }
+            } else {
+                // Log missing status code
+                wc_get_logger()->error(
+                    sprintf('Order %d response missing status_code: %s', 
+                        $order_id,
+                        print_r($order_details, true)
+                    ),
+                    ['source' => 'wcospa']
+                );
             }
         }
     }
@@ -193,46 +244,5 @@ class WCOSPA_Shipment_Handler
         
         // Mark as alerted to prevent duplicate emails
         update_post_meta($order_id, '_wcospa_timeout_alerted', '1');
-    }
-
-    /**
-     * Check if current time is within processing window
-     */
-    private static function is_processing_time()
-    {
-        $current_time = current_time('timestamp');
-        
-        // Get day of week (0 = Sunday, 6 = Saturday)
-        $day = (int) date('w', $current_time);
-        
-        // Check if it's weekend
-        if ($day === 0 || $day === 6) {
-            return false;
-        }
-        
-        // Get current hour
-        $hour = (int) date('G', $current_time);
-        
-        // Check if within working hours
-        return $hour >= self::WORKING_HOURS_START && $hour < self::WORKING_HOURS_END;
-    }
-
-    /**
-     * Calculate working hours elapsed since start time
-     */
-    private static function calculate_working_hours($start_time)
-    {
-        $current_time = current_time('timestamp');
-        $elapsed_hours = 0;
-        $current_time_check = $start_time;
-
-        while ($current_time_check < $current_time) {
-            if (self::is_processing_time()) {
-                $elapsed_hours++;
-            }
-            $current_time_check += 3600; // Add one hour
-        }
-
-        return $elapsed_hours;
     }
 } 

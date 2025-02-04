@@ -1,34 +1,129 @@
-=== WooCommerce Order Sync Pronto API ===
-Contributors: Jerry Li
-Tags: woocommerce, order sync, API, pronto
-Requires at least: 5.0
-Tested up to: 6.5.3
-Stable tag: 1.4.8
-License: GPLv2 or later
-License URI: https://www.gnu.org/licenses/gpl-2.0.html
+### WooCommerce Order Sync Pronto API Plugin
 
-Sync WooCommerce orders with the Pronto API automatically upon successful processing. Includes a manual sync button, sync logs, status page, and automatic status checks.
+This plugin automatically syncs WooCommerce orders with the Pronto API upon successful processing. The plugin includes features like a manual sync button, order status sync logs, a sync status page, and automatic status checks to retrieve Pronto Order numbers.
 
-== Description ==
-
-The WooCommerce Order Sync Pronto API plugin automatically syncs WooCommerce orders with the Pronto API upon successful processing. The plugin includes features like a manual sync button, order status sync logs, a sync status page, and automatic status checks to retrieve Pronto Order numbers.
-
-### Key Features:
-
-- Automatic order syncing upon processing or completion.
-- Manual sync button for orders in the WooCommerce admin.
-- Sync status logging, including Pronto Order numbers.
-- Sync logs management, including a "Clear Sync Records" feature.
-- Automatic periodic status checks to retrieve Pronto Order numbers.
-- New column in the WooCommerce Orders admin page to display Pronto Order numbers.
-
-== Installation ==
+### Installation
 
 1. Upload the `wcospa` folder to the `/wp-content/plugins/` directory.
 2. Activate the plugin through the 'Plugins' menu in WordPress.
 3. Configure your API credentials in the `wcospa-credentials.php` file located in `includes/`.
 
-== Changelog ==
+### Order Processing Workflow
+
+1. **Order Sync Initiation**
+   - Triggered by `handle_order_sync()` method
+   - Sync request sent to Pronto API
+   - On success, order status updated to 'Pronto Received'
+   - Scheduled task created to fetch Pronto order number after 120 seconds
+
+2. **Pronto Order Number Retrieval**
+   - Scheduled task `scheduled_fetch_pronto_order()` executes
+   - Checks for existing Pronto order number in meta data
+   - If no number exists, fetches from API
+   - Stores number using: `update_post_meta($order_id, '_wcospa_pronto_order_number', $pronto_order_number)`
+
+3. **Order Meta Data Storage**
+   - Pronto order number stored with key: `_wcospa_pronto_order_number`
+   - Visible in WooCommerce order admin interface
+   - Displayed in custom column in orders list
+
+### Key Configurations
+
+#### Time Intervals and Limits
+
+The plugin operates with the following configured time intervals:
+
+- Initial Wait Period: 120 seconds before first Pronto order number fetch
+- Retry Interval: 30 seconds between retry attempts
+- Request Delay: 3 seconds between different orders
+- Maximum Retry Count: 5 attempts
+- Cron Job Interval: Every 60 seconds for pending orders processing
+
+#### Order Status Management
+
+The following order statuses are excluded from processing:
+
+- Shipped
+- Delivered
+- Cancelled
+- On Hold
+- Completed
+- Refunded
+- Failed
+
+#### Meta Data Fields
+
+The plugin utilises these meta fields for order tracking:
+
+- `_wcospa_transaction_uuid`: Transaction identifier
+- `_wcospa_sync_time`: Synchronisation timestamp
+- `_wcospa_fetch_retry_count`: Number of fetch attempts
+- `_wcospa_pronto_order_number`: Pronto order reference
+- `_wcospa_shipment_number`: Shipping tracking number
+
+#### Shipment Tracking
+
+Advanced Shipment Tracking integration:
+
+- Provider Name: "Australia Post"
+- Automatic status update to "Completed" upon tracking number receipt
+- Tracking information added automatically after successful fetch
+
+#### Key Action Hooks
+
+The plugin responds to these WordPress hooks:
+
+- `woocommerce_order_status_processing`: Triggers order synchronisation
+- `wcospa_fetch_pronto_order_number`: Initiates Pronto order number fetch
+- `wcospa_process_pending_orders`: Processes pending order queue
+- `wcospa_pronto_order_number_received`: Handles successful order number receipt
+
+The plugin introduces a custom order status:
+
+- Status Name: "Pronto Received" (`wc-pronto-received`)
+- Visual Indicator: Orange background with white text
+- Automatically applied after successful API synchronisation
+
+#### Core Functionality Flow
+
+1. Order Synchronisation:
+   - Triggered when order status changes to "processing"
+   - Obtains transaction UUID
+   - Initiates 120-second wait period
+   - Attempts to fetch Pronto order number
+   - Immediately attempts to fetch shipment number upon success
+
+2. Pronto Order Number Retrieval:
+   - Maximum of 5 retry attempts
+   - 30-second interval between retries
+   - 3-second delay between different orders
+
+3. Shipment Number Processing:
+   - Automatic retrieval upon Pronto order number receipt
+   - Manual retrieval via "Get Shipping" button
+   - Automatic integration with Advanced Shipment Tracking
+   - Updates order status upon successful tracking addition
+
+### License
+
+This plugin is licensed under the GPLv2 or later. For more information, see https://www.gnu.org/licenses/gpl-2.0.html.
+
+### Changelog
+
+#### 1.4.10
+- **Feature**: Added weekend order handling with special Monday morning processing
+- **Feature**: Implemented 30-minute retry interval for weekend orders
+- **Improvement**: Enhanced logging for weekend order processing
+- **Improvement**: Added Sydney timezone support for all time-based operations
+- **Bug Fix**: Fixed issue with order processing outside working hours
+- **Security**: Added request locking mechanism for AJAX operations
+
+= 1.4.9 =
+
+- Updated version number
+- Improved WooCommerce dependency handling
+- Added better error handling and logging
+
 = 1.4.8 =
 
 - **Enhancement:** Added weekend processing control for Pronto order number fetching.
@@ -201,148 +296,3 @@ The WooCommerce Order Sync Pronto API plugin automatically syncs WooCommerce ord
   - Automatically syncs WooCommerce orders with the Pronto API upon successful processing.
   - Added a manual sync button to the WooCommerce admin order actions.
   - Logging for successful API requests, including order details and sync timestamps.
-
-== Frequently Asked Questions ==
-
-= How do I set up the plugin? =
-After installing and activating the plugin, you need to configure your API credentials by editing the `wcospa-credentials.php` file located in the `includes/` directory.
-
-= Can I manually sync an order? =
-Yes, you can manually sync an order by clicking the "Sync" button in the WooCommerce admin order actions. After syncing, the button will display "Pending" until the Pronto Order number is retrieved.
-
-= What happens if an order is already synced? =
-Once an order is synced, the "Sync" button will be disabled and display "Already Synced" along with the Pronto Order number.
-
-= How does the plugin handle pending orders? =
-If the transaction status is "Pending", the plugin will automatically check the status every minute for up to 10 minutes. Once the status changes to "Complete", the Pronto Order number will be retrieved and displayed.
-
-= Order Processing Workflow =
-
-1. **Order Sync Initiation**
-
-   - Triggered by `handle_order_sync()` method
-   - Sync request sent to Pronto API
-   - On success, order status updated to 'Pronto Received'
-   - Scheduled task created to fetch Pronto order number after 120 seconds
-
-2. **Pronto Order Number Retrieval**
-
-   - Scheduled task `scheduled_fetch_pronto_order()` executes
-   - Checks for existing Pronto order number in meta data
-   - If no number exists, fetches from API
-   - Stores number using: `update_post_meta($order_id, '_wcospa_pronto_order_number', $pronto_order_number)`
-
-3. **Order Meta Data Storage**
-   - Pronto order number stored with key: `_wcospa_pronto_order_number`
-   - Visible in WooCommerce order admin interface
-   - Displayed in custom column in orders list
-
-== License ==
-
-This plugin is licensed under the GPLv2 or later. For more information, see https://www.gnu.org/licenses/gpl-2.0.html.
-
-== Key Configurations ==
-
-= Time Intervals and Limits =
-
-The plugin operates with the following configured time intervals:
-
-- Initial Wait Period: 120 seconds before first Pronto order number fetch
-- Retry Interval: 30 seconds between retry attempts
-- Request Delay: 3 seconds between different orders
-- Maximum Retry Count: 5 attempts
-- Cron Job Interval: Every 60 seconds for pending orders processing
-
-= Order Status Management =
-
-The following order statuses are excluded from processing:
-
-- Shipped
-- Delivered
-- Cancelled
-- On Hold
-- Completed
-- Refunded
-- Failed
-
-= Meta Data Fields =
-
-The plugin utilises these meta fields for order tracking:
-
-- `_wcospa_transaction_uuid`: Transaction identifier
-- `_wcospa_sync_time`: Synchronisation timestamp
-- `_wcospa_fetch_retry_count`: Number of fetch attempts
-- `_wcospa_pronto_order_number`: Pronto order reference
-- `_wcospa_shipment_number`: Shipping tracking number
-
-= Shipment Tracking =
-
-Advanced Shipment Tracking integration:
-
-- Provider Name: "Australia Post"
-- Automatic status update to "Completed" upon tracking number receipt
-- Tracking information added automatically after successful fetch
-
-= Key Action Hooks =
-
-The plugin responds to these WordPress hooks:
-
-- `woocommerce_order_status_processing`: Triggers order synchronisation
-- `wcospa_fetch_pronto_order_number`: Initiates Pronto order number fetch
-- `wcospa_process_pending_orders`: Processes pending order queue
-- `wcospa_pronto_order_number_received`: Handles successful order number receipt
-
-= JavaScript Configurations =
-
-Frontend behaviour settings:
-
-- Maximum Retries: 5 attempts
-- Retry Delay: 30 seconds
-- Button Event Binding: Every 2 seconds
-- Automatic status updates without page refresh
-
-= Custom Order Status =
-
-The plugin introduces a custom order status:
-
-- Status Name: "Pronto Received" (`wc-pronto-received`)
-- Visual Indicator: Orange background with white text
-- Automatically applied after successful API synchronisation
-
-= Core Functionality Flow =
-
-1. Order Synchronisation:
-
-   - Triggered when order status changes to "processing"
-   - Obtains transaction UUID
-   - Initiates 120-second wait period
-   - Attempts to fetch Pronto order number
-   - Immediately attempts to fetch shipment number upon success
-
-2. Pronto Order Number Retrieval:
-
-   - Maximum of 5 retry attempts
-   - 30-second interval between retries
-   - 3-second delay between different orders
-
-3. Shipment Number Processing:
-   - Automatic retrieval upon Pronto order number receipt
-   - Manual retrieval via "Get Shipping" button
-   - Automatic integration with Advanced Shipment Tracking
-   - Updates order status upon successful tracking addition
-
-= File Structure =
-
-```
-includes/
-  ├── class-wcospa-order-handler.php      # Order processing core
-  ├── class-wcospa-api-client.php         # API communication
-  ├── class-wcospa-admin-sync-status.php  # Sync status management
-  ├── class-wcospa-shipment-handler.php   # Shipment processing
-  └── wcospa-credentials.php              # API credentials
-assets/
-  ├── js/
-  │   └── wcospa-admin.js                 # Admin interface scripts
-  └── css/
-      └── wcospa-admin.css                # Admin interface styles
-```

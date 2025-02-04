@@ -1,10 +1,20 @@
 <?php
-// This file creates the Sync Status admin page and manages its functionality
+/**
+ * Admin Sync Status functionality
+ *
+ * @package WCOSPA
+ * @version 1.4.9
+ */
 
+// Exit if accessed directly
 if (!defined('ABSPATH')) {
     exit;
 }
 
+/**
+ * Class WCOSPA_Admin_Sync_Status
+ * Handles the sync status admin page functionality
+ */
 class WCOSPA_Admin_Sync_Status
 {
     public static function init()
@@ -43,26 +53,62 @@ class WCOSPA_Admin_Sync_Status
         if ($hook !== 'woocommerce_page_wcospa-sync-status') {
             return;
         }
-        wp_enqueue_script('wcospa-admin', WCOSPA_URL.'assets/js/wcospa-admin.js', [], WCOSPA_VERSION, true);
+        
+        // Add nonce for AJAX security
+        wp_enqueue_script('wcospa-admin', WCOSPA_URL.'assets/js/wcospa-admin.js', ['jquery'], WCOSPA_VERSION, true);
+        wp_localize_script('wcospa-admin', 'wcospaAdmin', [
+            'ajax_url' => admin_url('admin-ajax.php'),
+            'nonce' => wp_create_nonce('wcospa_admin_nonce')
+        ]);
     }
 
-    // Keep the method to clear all sync data
     public static function clear_all_sync_data()
     {
-        $orders = get_posts([
-            'post_type' => 'shop_order',
-            'post_status' => 'any',
-            'fields' => 'ids',
-            'posts_per_page' => -1,
-        ]);
+        // Verify nonce for security
+        check_ajax_referer('wcospa_admin_nonce', 'nonce');
 
-        foreach ($orders as $order_id) {
-            delete_post_meta($order_id, '_wcospa_transaction_uuid');
-            delete_post_meta($order_id, '_wcospa_pronto_order_number');
+        // Check user capabilities
+        if (!current_user_can('manage_woocommerce')) {
+            wp_send_json_error(__('You do not have permission to perform this action.', 'wcospa'));
         }
 
-        wp_send_json_success(__('All sync data "_wcospa_transaction_uuid" & "_wcospa_pronto_order_number" has been cleared.', 'wcospa'));
+        // Use WC_Order_Query instead of get_posts for better compatibility
+        try {
+            $query = new WC_Order_Query([
+                'limit' => -1,
+                'return' => 'ids',
+                'type' => 'shop_order', // Explicitly set the order type
+            ]);
+            
+            $orders = $query->get_orders();
+
+            if (empty($orders)) {
+                wp_send_json_success(__('No orders found to clear.', 'wcospa'));
+                return;
+            }
+
+            foreach ($orders as $order_id) {
+                delete_post_meta($order_id, '_wcospa_transaction_uuid');
+                delete_post_meta($order_id, '_wcospa_pronto_order_number');
+            }
+
+            wp_send_json_success(sprintf(
+                /* translators: %d: number of orders processed */
+                __('Sync data cleared for %d orders.', 'wcospa'),
+                count($orders)
+            ));
+
+        } catch (Exception $e) {
+            wc_get_logger()->error(
+                'Error clearing sync data: ' . $e->getMessage(),
+                ['source' => 'wcospa']
+            );
+            wp_send_json_error(__('An error occurred while clearing sync data.', 'wcospa'));
+        }
     }
 }
 
-WCOSPA_Admin_Sync_Status::init();
+// Initialize the class if WooCommerce is active
+if (in_array('woocommerce/woocommerce.php', apply_filters('active_plugins', get_option('active_plugins')))) {
+    WCOSPA_Admin_Sync_Status::init();
+}
