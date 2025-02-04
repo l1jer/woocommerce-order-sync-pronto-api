@@ -1,6 +1,7 @@
 .DS_Store
 includes/wcospa-credentials.php
 .cursorrules
+.cursorrules
 
 # WordPress core files
 wp-config.php

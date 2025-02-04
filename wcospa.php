@@ -53,6 +53,7 @@ function wcospa_init() {
     require_once WCOSPA_PATH . 'includes/class-wcospa-admin-sync-status.php';
     require_once WCOSPA_PATH . 'includes/class-wcospa-shipment-handler.php';
     require_once WCOSPA_PATH . 'includes/wcospa-credentials.php';
+    require_once WCOSPA_PATH . 'int/class-wcospa-int.php';
 
     // Initialize plugin components
     WCOSPA_Order_Handler::init();
@@ -60,6 +61,7 @@ function wcospa_init() {
     WCOSPA_Admin_Sync_Status::init();
     WCOSPA_Admin_Orders_Column::init();
     WCOSPA_Shipment_Handler::init();
+    new WCOSPA_INT();
 
     // Add queue processing to admin-ajax.php
     add_action('admin_init', function() {

@@ -1,0 +1,100 @@
+{
+    "countries": {
+        "Argentina": {
+            "dealer_email": "jerry@tasco.com.au",
+            "country_code": "AR"
+        },
+        "Austria": {
+            "dealer_email": "jerry@tasco.com.au",
+            "country_code": "AT"
+        },
+        "Belgium": {
+            "dealer_email": "jerry@tasco.com.au",
+            "country_code": "BE"
+        },
+        "Bulgaria": {
+            "dealer_email": "jerry@tasco.com.au",
+            "country_code": "BG"
+        },
+        "Denmark": {
+            "dealer_email": "jerry@tasco.com.au",
+            "country_code": "DK"
+        },
+        "Estonia": {
+            "dealer_email": "jerry@tasco.com.au",
+            "country_code": "EE"
+        },
+        "Finland": {
+            "dealer_email": "jerry@tasco.com.au",
+            "country_code": "FI"
+        },
+        "Germany": {
+            "dealer_email": "jerry@tasco.com.au",
+            "country_code": "DE"
+        },
+        "Greece": {
+            "dealer_email": "jerry@tasco.com.au",
+            "country_code": "GR"
+        },
+        "Hungary": {
+            "dealer_email": "jerry@tasco.com.au",
+            "country_code": "HU"
+        },
+        "India": {
+            "dealer_email": "jerry@tasco.com.au",
+            "country_code": "IN"
+        },
+        "Ireland": {
+            "dealer_email": "jerry@tasco.com.au",
+            "country_code": "IE"
+        },
+        "Italy": {
+            "dealer_email": "jerry@tasco.com.au",
+            "country_code": "IT"
+        },
+        "Japan": {
+            "dealer_email": "jerry@tasco.com.au",
+            "country_code": "JP"
+        },
+        "Latvia": {
+            "dealer_email": "jerry@tasco.com.au",
+            "country_code": "LV"
+        },
+        "Lithuania": {
+            "dealer_email": "jerry@tasco.com.au",
+            "country_code": "LT"
+        },
+        "Luxembourg": {
+            "dealer_email": "jerry@tasco.com.au",
+            "country_code": "LU"
+        },
+        "Netherlands": {
+            "dealer_email": "jerry@tasco.com.au",
+            "country_code": "NL"
+        },
+        "Poland": {
+            "dealer_email": "jerry@tasco.com.au",
+            "country_code": "PL"
+        },
+        "Portugal": {
+            "dealer_email": "jerry@tasco.com.au",
+            "country_code": "PT"
+        },
+        "South Korea": {
+            "dealer_email": "jerry@tasco.com.au",
+            "country_code": "KR"
+        },
+        "Spain": {
+            "dealer_email": "jerry@tasco.com.au",
+            "country_code": "ES"
+        },
+        "Sweden": {
+            "dealer_email": "jerry@tasco.com.au",
+            "country_code": "SE"
+        },
+        "United Kingdom": {
+            "dealer_email": "jerry@tasco.com.au",
+            "country_code": "GB"
+        }
+    }
+} 

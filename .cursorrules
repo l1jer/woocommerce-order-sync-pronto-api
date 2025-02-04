@@ -9,6 +9,7 @@ Key Principles
 - Use descriptive function, variable, and file names.
 - Use lowercase with hyphens for directories (e.g., wp-content/themes/my-theme) (e.g., wp-content/plugins/my-plugin).
 - Favor hooks (actions and filters) for extending functionality.
+- As the branch of INT, do not change the existing files inside of includes/ directory, creating another folder instead.
 
 PHP/WordPress/WooCommerce
 
