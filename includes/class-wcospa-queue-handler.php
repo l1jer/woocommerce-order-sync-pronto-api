@@ -5,10 +5,14 @@
  * Handles queued processing of order numbers and shipment tracking
  *
  * @package WCOSPA
- * @version 1.4.9
+ * @version 1.4.10
  */
 
 declare(strict_types=1);
+
+if (!defined('ABSPATH')) {
+    exit;
+}
 
 class WCOSPA_Queue_Handler {
     const QUEUE_PROCESS_INTERVAL = 3; // 3 seconds between each process

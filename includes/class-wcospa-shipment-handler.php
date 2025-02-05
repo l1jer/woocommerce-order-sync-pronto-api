@@ -8,20 +8,49 @@ declare(strict_types=1);
 class WCOSPA_Shipment_Handler
 {
     const RETRY_INTERVAL = 3600; // 1 hour in seconds
-    const MAX_TIMEOUT = 48;      // 48 hours
 
     /**
      * Initialise the shipment handler
      */
     public static function init()
     {
-        // Schedule the cron event if not already scheduled
-        if (!wp_next_scheduled('wcospa_process_shipment_tracking')) {
-            wp_schedule_event(time(), 'every_three_minutes', 'wcospa_process_shipment_tracking');
+        // Remove existing schedule if any
+        $timestamp = wp_next_scheduled('wcospa_process_shipment_tracking');
+        if ($timestamp) {
+            wp_unschedule_event($timestamp, 'wcospa_process_shipment_tracking');
+        }
+
+        // Schedule twice daily checks (11:55 AM and 4:55 PM Sydney time)
+        if (!wp_next_scheduled('wcospa_process_shipment_tracking_scheduled')) {
+            // Get current Sydney time
+            $sydney_timezone = new DateTimeZone('Australia/Sydney');
+            $sydney_time = new DateTime('now', $sydney_timezone);
+            $current_time = $sydney_time->format('H:i');
+            
+            // Set up morning schedule (11:55 AM)
+            $morning = new DateTime('today 11:55', $sydney_timezone);
+            if ($current_time > '11:55') {
+                $morning->modify('+1 day');
+            }
+            
+            // Set up afternoon schedule (4:55 PM)
+            $afternoon = new DateTime('today 16:55', $sydney_timezone);
+            if ($current_time > '16:55') {
+                $afternoon->modify('+1 day');
+            }
+            
+            // Only schedule on weekdays (Monday to Friday)
+            if ($morning->format('N') <= 5) {
+                wp_schedule_single_event($morning->getTimestamp(), 'wcospa_process_shipment_tracking_scheduled');
+            }
+            if ($afternoon->format('N') <= 5) {
+                wp_schedule_single_event($afternoon->getTimestamp(), 'wcospa_process_shipment_tracking_scheduled');
+            }
         }
 
         // Add action hooks
-        add_action('wcospa_process_shipment_tracking', [__CLASS__, 'process_pending_shipments']);
+        add_action('wcospa_process_shipment_tracking_scheduled', [__CLASS__, 'schedule_next_check']);
+        add_action('wcospa_process_shipment_tracking_scheduled', [__CLASS__, 'process_pending_shipments']);
         add_action('wcospa_pronto_order_number_received', [__CLASS__, 'schedule_shipment_tracking'], 10, 2);
     }
 
@@ -43,10 +72,6 @@ class WCOSPA_Shipment_Handler
      */
     public static function process_pending_shipments()
     {
-        if (!WCOSPA_Utils::is_processing_time()) {
-            return;
-        }
-
         global $wpdb;
 
         $query = $wpdb->prepare("
@@ -77,15 +102,7 @@ class WCOSPA_Shipment_Handler
             }
 
             $order_id = (int) $order_data->post_id;
-            $tracking_start = (int) $order_data->tracking_start;
-            $working_hours = WCOSPA_Utils::calculate_working_hours($tracking_start);
-
-            // Check if we've exceeded the 48-hour limit
-            if ($working_hours >= self::MAX_TIMEOUT) {
-                self::send_timeout_alert($order_id);
-                continue;
-            }
-
+            
             // Get current attempt count
             $attempts = (int) get_post_meta($order_id, '_wcospa_shipment_tracking_attempts', true);
             $last_attempt = (int) get_post_meta($order_id, '_wcospa_last_tracking_attempt', true);
@@ -206,43 +223,27 @@ class WCOSPA_Shipment_Handler
         return false;
     }
 
-    /**
-     * Send timeout alert email
-     */
-    private static function send_timeout_alert($order_id)
+    public static function schedule_next_check()
     {
-        $order = wc_get_order($order_id);
-        if (!$order) {
-            return;
+        // Schedule next check
+        $sydney_timezone = new DateTimeZone('Australia/Sydney');
+        $sydney_time = new DateTime('now', $sydney_timezone);
+        $current_time = $sydney_time->format('H:i');
+        
+        // Determine next check time
+        if ($current_time < '11:55') {
+            $next_check = new DateTime('today 11:55', $sydney_timezone);
+        } elseif ($current_time < '16:55') {
+            $next_check = new DateTime('today 16:55', $sydney_timezone);
+        } else {
+            $next_check = new DateTime('tomorrow 11:55', $sydney_timezone);
         }
-
-        $pronto_order_number = get_post_meta($order_id, '_wcospa_pronto_order_number', true);
         
-        $subject = sprintf('Order #%s exceeded 48-hour shipping timeout', $order->get_order_number());
+        // Only schedule on weekdays
+        while ($next_check->format('N') > 5) {
+            $next_check->modify('+1 day');
+        }
         
-        $message = sprintf(
-            "Order #%s has exceeded the 48-hour shipping timeout.\n\n" .
-            "Order Details:\n" .
-            "Original Order ID: %s\n" .
-            "Pronto Order Number: %s\n" .
-            "Order Status: %s\n" .
-            "Order Total: %s\n" .
-            "Customer: %s %s\n" .
-            "Email: %s\n\n" .
-            "This order has not received a shipment number after 48 working hours.",
-            $order->get_order_number(),
-            $order_id,
-            $pronto_order_number,
-            $order->get_status(),
-            $order->get_formatted_order_total(),
-            $order->get_billing_first_name(),
-            $order->get_billing_last_name(),
-            $order->get_billing_email()
-        );
-
-        wp_mail('jerry@tasco.com.au', $subject, $message);
-        
-        // Mark as alerted to prevent duplicate emails
-        update_post_meta($order_id, '_wcospa_timeout_alerted', '1');
+        wp_schedule_single_event($next_check->getTimestamp(), 'wcospa_process_shipment_tracking_scheduled');
     }
 } 

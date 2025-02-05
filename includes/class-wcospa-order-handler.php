@@ -136,19 +136,13 @@ class WCOSPA_Order_Handler
      */
     public static function scheduled_fetch_pronto_order($order_id, $attempt = 1)
     {
-        // Check if within working hours
-        if (!WCOSPA_Utils::is_processing_time()) {
-            wc_get_logger()->debug(
-                sprintf('Skipping Pronto order fetch for order %d - Outside working hours', $order_id),
-                ['source' => 'wcospa']
-            );
-            return;
-        }
-
         // Check if Pronto Order Number already exists
         $existing_number = get_post_meta($order_id, '_wcospa_pronto_order_number', true);
         if (!empty($existing_number)) {
-            error_log("Order {$order_id} already has Pronto Order Number: {$existing_number}");
+            wc_get_logger()->debug(
+                sprintf('Order %d already has Pronto Order Number: %s', $order_id, $existing_number),
+                ['source' => 'wcospa']
+            );
             return;
         }
 
