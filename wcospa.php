@@ -48,6 +48,7 @@ function wcospa_init() {
 
     // Include required files
     require_once WCOSPA_PATH . 'includes/class-wcospa-utils.php';
+    require_once WCOSPA_PATH . 'includes/class-wcospa-queue-handler.php';
     require_once WCOSPA_PATH . 'includes/class-wcospa-order-handler.php';
     require_once WCOSPA_PATH . 'includes/class-wcospa-api-client.php';
     require_once WCOSPA_PATH . 'includes/class-wcospa-admin-sync-status.php';
