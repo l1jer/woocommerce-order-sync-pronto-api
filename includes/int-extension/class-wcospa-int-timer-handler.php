@@ -40,6 +40,7 @@ class WCOSPA_INT_Timer_Handler {
     public function schedule_timer_check(): void {
         if (!wp_next_scheduled('wcospa_int_check_timers')) {
             wp_schedule_event(time(), 'hourly', 'wcospa_int_check_timers');
+            $this->log_debug('Timer check scheduled for hourly execution');
         }
     }
 
@@ -47,8 +48,10 @@ class WCOSPA_INT_Timer_Handler {
      * Check decision and shipping timers
      */
     public function check_timers(): void {
+        $this->log_debug('Starting timer check process');
         $this->check_decision_timers();
         $this->check_shipping_timers();
+        $this->log_debug('Timer check process completed');
     }
 
     /**
@@ -56,6 +59,8 @@ class WCOSPA_INT_Timer_Handler {
      */
     private function check_decision_timers(): void {
         global $wpdb;
+
+        $this->log_debug('Checking decision timers');
 
         // Get orders with expired decision timers
         $expired_orders = $wpdb->get_results(
@@ -67,6 +72,8 @@ class WCOSPA_INT_Timer_Handler {
             )
         );
 
+        $this->log_debug(sprintf('Found %d orders with expired decision timers', count($expired_orders)));
+
         foreach ($expired_orders as $expired_order) {
             $order_id = $expired_order->post_id;
             $order = wc_get_order($order_id);
@@ -74,6 +81,16 @@ class WCOSPA_INT_Timer_Handler {
             if (!$order || $order->get_status() !== 'await-dealer') {
                 continue;
             }
+
+            $timer_start = (int) $expired_order->meta_value;
+            $time_elapsed = time() - $timer_start;
+            
+            $this->log_debug(sprintf(
+                'Decision timer expired for order #%d. Timer started: %s, Elapsed time: %s hours',
+                $order_id,
+                date('Y-m-d H:i:s', $timer_start),
+                round($time_elapsed / 3600, 2)
+            ));
 
             // No response received, trigger Pronto sync
             $order->add_order_note(__('No dealer response received within 48 hours. Proceeding with Pronto sync.', 'wcospa'));
@@ -85,6 +102,8 @@ class WCOSPA_INT_Timer_Handler {
 
             // Trigger Pronto sync
             do_action('wcospa_sync_order', $order_id);
+            
+            $this->log_debug(sprintf('Order #%d processed: Timer cleared and Pronto sync triggered', $order_id));
         }
     }
 
@@ -93,6 +112,8 @@ class WCOSPA_INT_Timer_Handler {
      */
     private function check_shipping_timers(): void {
         global $wpdb;
+
+        $this->log_debug('Checking shipping timers');
 
         // Get orders with expired shipping timers
         $expired_orders = $wpdb->get_results(
@@ -103,6 +124,8 @@ class WCOSPA_INT_Timer_Handler {
                 time() - self::SHIPPING_TIMER_DURATION
             )
         );
+
+        $this->log_debug(sprintf('Found %d orders with expired shipping timers', count($expired_orders)));
 
         foreach ($expired_orders as $expired_order) {
             $order_id = $expired_order->post_id;
@@ -116,8 +139,19 @@ class WCOSPA_INT_Timer_Handler {
             $is_shipped = $order->get_meta('_wcospa_int_shipped');
             if ($is_shipped) {
                 delete_post_meta($order_id, '_wcospa_int_shipping_timer');
+                $this->log_debug(sprintf('Order #%d already shipped, clearing timer', $order_id));
                 continue;
             }
+
+            $timer_start = (int) $expired_order->meta_value;
+            $time_elapsed = time() - $timer_start;
+            
+            $this->log_debug(sprintf(
+                'Shipping timer expired for order #%d. Timer started: %s, Elapsed time: %s hours',
+                $order_id,
+                date('Y-m-d H:i:s', $timer_start),
+                round($time_elapsed / 3600, 2)
+            ));
 
             // Send notification to admins
             $admin_emails = ['jli@zerotech.com.au'];
@@ -133,6 +167,8 @@ class WCOSPA_INT_Timer_Handler {
 
             $order->add_order_note(__('Shipping delay notification sent to administrators.', 'wcospa'));
             delete_post_meta($order_id, '_wcospa_int_shipping_timer');
+            
+            $this->log_debug(sprintf('Order #%d processed: Timer cleared and delay notification sent', $order_id));
         }
     }
 
@@ -163,7 +199,14 @@ class WCOSPA_INT_Timer_Handler {
      * Start shipping timer for an order
      */
     public function start_shipping_timer(int $order_id): void {
-        update_post_meta($order_id, '_wcospa_int_shipping_timer', time());
+        $start_time = time();
+        update_post_meta($order_id, '_wcospa_int_shipping_timer', $start_time);
+        
+        $this->log_debug(sprintf(
+            'Started shipping timer for order #%d at %s (48-hour countdown)',
+            $order_id,
+            date('Y-m-d H:i:s', $start_time)
+        ));
     }
 
     /**
@@ -181,5 +224,18 @@ class WCOSPA_INT_Timer_Handler {
 
         // Remove shipping timer
         delete_post_meta($order_id, '_wcospa_int_shipping_timer');
+        
+        $this->log_debug(sprintf('Order #%d marked as shipped by dealer, timer cleared', $order_id));
+    }
+
+    /**
+     * Log debug message
+     *
+     * @param string $message Debug message
+     */
+    private function log_debug(string $message): void {
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            error_log(sprintf('[WCOSPA INT Timer] %s', $message));
+        }
     }
 } 
