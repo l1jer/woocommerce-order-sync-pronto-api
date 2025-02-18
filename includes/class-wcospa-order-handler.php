@@ -26,9 +26,15 @@ class WCOSPA_Order_Handler
      */
     public static function init()
     {
-        add_action('woocommerce_order_status_processing', [__CLASS__, 'handle_order_sync'], 10, 1);
+        // Remove automatic sync on processing status
+        // add_action('woocommerce_order_status_processing', [__CLASS__, 'handle_order_sync'], 10, 1);
+        
+        // Keep other necessary hooks
         add_action('wcospa_fetch_pronto_order_number', [__CLASS__, 'scheduled_fetch_pronto_order'], 10, 2);
         add_action('wcospa_process_pending_orders', [__CLASS__, 'process_pending_orders'], 10);
+        
+        // Add filter to control sync behavior
+        add_filter('wcospa_allow_auto_sync', '__return_false');
         
         // Schedule recurring event for processing pending orders
         if (!wp_next_scheduled('wcospa_process_pending_orders')) {
@@ -98,6 +104,11 @@ class WCOSPA_Order_Handler
      */
     public static function handle_order_sync($order_id)
     {
+        // Check if auto sync is allowed
+        if (!apply_filters('wcospa_allow_auto_sync', false) && !did_action('wcospa_sync_order')) {
+            return;
+        }
+        
         $response = WCOSPA_API_Client::sync_order($order_id);
 
         if (is_wp_error($response)) {

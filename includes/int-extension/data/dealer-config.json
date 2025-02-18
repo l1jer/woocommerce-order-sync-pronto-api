@@ -1,0 +1,35 @@
+{
+    "dealers": {
+        "DE": {
+            "email": "jerry@tasco.com.au"
+        },
+        "FR": {
+            "email": "jli@zerotech.com.au"
+        },
+        "IT": {
+            "email": "jerry@tasco.com.au"
+        },
+        "ES": {
+            "email": "jerry@tasco.com.au"
+        },
+        "NL": {
+            "email": "jerry@tasco.com.au"
+        },
+        "BE": {
+            "email": "jerry@tasco.com.au"
+        },
+        "AT": {
+            "email": "jerry@tasco.com.au"
+        },
+        "CH": {
+            "email": "jerry@tasco.com.au"
+        },
+        "DK": {
+            "email": "jerry@tasco.com.au"
+        },
+        "SE": {
+            "email": "jerry@tasco.com.au"
+        }
+    },
+    "default_email": "jerry@tasco.com.au"
+} 

@@ -14,10 +14,12 @@
   - **Testing:** Verify all files load correctly, check for errors, and retest thoroughly.
   - **Separation:** Integrate these changes in the `INT` branch without modifying existing files or folders.
   - Ensure all files are loaded correctly and definately
+  - Creat individual folder for this extension
 
 ## Step 1: JSON File for Dealers
 
 - **Objective:** Create a JSON file that lists countries with associated dealer emails.
+- Prevent automatic progression from "Processing" to "Pronto Received".
 - **Details:**
   - Each country must have a dealer email.
   - Default email: `jerry@tasco.com.au`.
@@ -41,8 +43,8 @@
 - **Objective:** Implement a dealer-driven order processing workflow.
 - **Details:**
   - **Order Handling:**
-    - Prevent automatic progression from "Processing" to "Pronto Received".
     - Upon order receipt, send the dealer email (dealer selected from the JSON file based on shipping country).
+    - Ensure: Prevent automatic progression from "Processing" to "Pronto Received" unless other functions call it.
   - **On Successful Email Send:**
     - Update order status to "Await Dealer Decision".
     - Save the dealer’s email in the order meta data.
@@ -62,3 +64,15 @@
     - If still unsuccessful:
       - Email `jheads@zerotech.com.au` and `jli@zerotech.com.au` with the failure details.
       - Update order status to "Email Dealer Failed" and stop further actions.
+
+
+
+step 4: http://zt-int-staging.local/?action=wcospa\_int\_accept\_order&order\_id=21744&nonce=a3ed663fec
+
+It says "Invalid request." where I use incognito mode to this accept button/reject button. For those dealers who have no account on our website, so those urls from both "accept" and "reject" buttons need to be working for guest/non-login users. Reveiw this issue, identify the problems, then fix it with caution in the best practice.
+
+step 5: If the order has received "accept" or "reject" signal, the links in the email will not work anymore, which is saying, "accept" and "reject buttons in one email(in one order) only can be taken action once, e.g. "accept" button been clicked, then the "reject" button(the reject url) will be not working, even the "accept" button cannot be click again to send signal to website api, instead, when clicked it will say "you have already accepted/rejected order xxx at time of xx:xx xx/xx/xxxx, if there is further request please contact jheads@zerotech.com.au"
+
+step 6:. When Decline been clicked and signal sent to website api, trigger the process of sync the order to Pronto then change the order status to Pronto Received
+
+step 7:

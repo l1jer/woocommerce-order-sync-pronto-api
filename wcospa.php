@@ -28,7 +28,7 @@ add_action('plugins_loaded', function() {
     if (!defined('WCOSPA_VERSION')) {
         define('WCOSPA_VERSION', '1.4.10');
     }
-});
+}, 5); // Priority 5 to ensure constants are defined early
 
 /**
  * Initialise plugin functionality
@@ -55,12 +55,18 @@ function wcospa_init() {
     require_once WCOSPA_PATH . 'includes/class-wcospa-shipment-handler.php';
     require_once WCOSPA_PATH . 'includes/wcospa-credentials.php';
 
+    // Include INT extension files
+    require_once WCOSPA_PATH . 'includes/int-extension/class-wcospa-int-extension.php';
+
     // Initialize plugin components
     WCOSPA_Order_Handler::init();
     WCOSPA_Order_Sync_Button::init();
     WCOSPA_Admin_Sync_Status::init();
     WCOSPA_Admin_Orders_Column::init();
     WCOSPA_Shipment_Handler::init();
+
+    // Initialize INT extension
+    new WCOSPA_INT_Extension();
 
     // Add queue processing to admin-ajax.php
     add_action('admin_init', function() {
@@ -70,8 +76,8 @@ function wcospa_init() {
     });
 }
 
-// Hook into WordPress init
-add_action('plugins_loaded', 'wcospa_init');
+// Hook into WordPress init with priority 10 (after plugins_loaded)
+add_action('plugins_loaded', 'wcospa_init', 10);
 
 /**
  * Activation hook
