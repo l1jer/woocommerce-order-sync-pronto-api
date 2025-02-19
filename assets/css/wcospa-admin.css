@@ -9,6 +9,18 @@
     margin-left: 5px;
 }
 
+.response-type {
+    font-weight: 600;
+    color: #2c3338;
+    margin-bottom: 3px;
+}
+
+.sydney-time,
+.dealer-time {
+    font-size: 12px;
+    color: #646970;
+}
+
 .pronto-order-number {
     font-weight: 400;
 }

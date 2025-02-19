@@ -92,14 +92,14 @@ $show_shipping = $shipping_address !== $billing_address;
         <table width="100%" border="0" cellspacing="0" cellpadding="0">
             <tr>
                 <td>
-                    <table border="0" cellspacing="0" cellpadding="0">
+                    <table border="0" cellspacing="0" cellpadding="0" style="margin: 0 auto;">
                         <tr>
                             <td class="button-td" style="border-radius: 3px; background: #22c55e;">
                                 <a class="button-a" href="<?php echo esc_url($accept_url); ?>" style="background: #22c55e; border: 1px solid #22c55e; font-family: sans-serif; font-size: 15px; line-height: 15px; text-decoration: none; padding: 13px 17px; color: #ffffff; display: block; border-radius: 3px;">
                                     <?php esc_html_e('Accept & Fulfil', 'wcospa'); ?>
                                 </a>
                             </td>
-                            <td style="width: 20px;"></td>
+                            <td style="width: 40px;"></td>
                             <td class="button-td" style="border-radius: 3px; background: #ef4444;">
                                 <a class="button-a" href="<?php echo esc_url($decline_url); ?>" style="background: #ef4444; border: 1px solid #ef4444; font-family: sans-serif; font-size: 15px; line-height: 15px; text-decoration: none; padding: 13px 17px; color: #ffffff; display: block; border-radius: 3px;">
                                     <?php esc_html_e('Decline Order', 'wcospa'); ?>

@@ -280,7 +280,7 @@ class WCOSPA_INT_Email_Handler {
                 </div>
 
                 <p style="color: #666666; font-size: 14px; text-align: center; margin-top: 40px;">
-                    <?php _e('Please respond within 48 hours. If no response is received, the order will be automatically processed.', 'wcospa'); ?>
+                    <?php _e('Please respond within 48 hours. If no response is received, the order will be automatically processed by ZeroTech Australia.', 'wcospa'); ?>
                 </p>
             </div>
         </body>

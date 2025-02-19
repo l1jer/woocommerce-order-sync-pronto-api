@@ -56,7 +56,6 @@
         - Start a 48-hour shipping timer:
           - **If order is marked "Shipped":**
             - Cancel the shipping timer.
-            - Record "Dealer" in a new "Shipping Responder" column on the Order page.
           - **If not shipped within 48 hours:**
             - Email `jhead@zerotech.com.au` and `jli@zerotech.com.au` alerting that the order was accepted but not shipped on time.
   - **On Email Failure:**
@@ -64,7 +63,6 @@
     - If still unsuccessful:
       - Email `jheads@zerotech.com.au` and `jli@zerotech.com.au` with the failure details.
       - Update order status to "Email Dealer Failed" and stop further actions.
-
 
 ### Step 4: Fixing Guest Access for Accept/Reject URLs
 
@@ -105,6 +103,33 @@
     - Update the order status to `"Pronto Received"`.
   - Ensure this process is error-handled and logged for tracking.
 
-step 7: update redirect page after ACCEPT/DECLINE the order
+### Step 7: Enhance Redirect Page and Email Notifications
 
-* Show order number and billing name has been accepted/declined at XX:XX, XX/XX/XXXX (using the dealer local time) also show AUS EASTERN Standard time
+#### Redirect Page Update
+
+- **Objective:**
+  - Update the redirect page displayed after a dealer accepts or declines an order.
+- **Details:**
+  - Display the order number and billing name with a confirmation message (e.g., "has been accepted" or "has been declined")
+  - Include timestamps in both:
+    - Dealer local time (formatted as XX:XX, XX/XX/XXXX)
+    - AUS Eastern Standard Time in a modern format
+  - Add debug logs on each necesasry actions been triggered
+
+#### New Email Notifications
+
+- **Objective:**
+  - Send new notification email(s) when an order is accepted or declined.
+- **Details:**
+  - Email content must state:
+
+    - "Dealer XXX has accepted/declined order XXX at XX:XX, XX/XX/XXXX" (showing both dealer local time and AUS Eastern Standard Time)
+  - Recipients:
+
+    - The dealer (as the main recipient)
+    - BCC: `jerry@tasco.com.au`
+  - Add debug logs on each necesasry actions been triggered
+
+#### Additional Requirement
+
+- Apply the default WooCommerce email header and footer template to all other emails sent by the system.

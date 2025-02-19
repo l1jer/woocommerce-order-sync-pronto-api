@@ -625,6 +625,38 @@ class WCOSPA_Order_Data_Formatter
         $business_name = $order->get_shipping_company();
 
         // Determine delivery address based on the conditions
+        // $delivery_address = [
+        //     'address1' => strtoupper($order->get_shipping_first_name() . ' ' . $order->get_shipping_last_name()),
+        //     'address2' => '',
+        //     'address3' => '',
+        //     'address4' => '',
+        //     'address5' => '',
+        //     'postcode' => $shipping_address['postcode'],
+        //     'phone' => $order->get_billing_phone(),
+        // ];
+
+        // // Apply the conditions to modify the delivery address
+        // if (empty($business_name) && empty($shipping_address['address_2'])) {
+        //     // 1. No business name and no 2nd address line
+        //     $delivery_address['address2'] = $shipping_address['address_1'];
+        //     $delivery_address['address3'] = $shipping_address['city'] . ' ' . $shipping_address['state'];
+        // } elseif (empty($business_name) && !empty($shipping_address['address_2'])) {
+        //     // 2. No business name, but 2nd address line exists
+        //     $delivery_address['address2'] = $shipping_address['address_1'];
+        //     $delivery_address['address3'] = $shipping_address['address_2'];
+        //     $delivery_address['address4'] = $shipping_address['city'] . ' ' . $shipping_address['state'];
+        // } elseif (!empty($business_name) && empty($shipping_address['address_2'])) {
+        //     // 3. Business name exists, but no 2nd address line
+        //     $delivery_address['address2'] = $business_name;
+        //     $delivery_address['address3'] = $shipping_address['address_1'];
+        //     $delivery_address['address4'] = $shipping_address['city'] . ' ' . $shipping_address['state'];
+        // } elseif (!empty($business_name) && !empty($shipping_address['address_2'])) {
+        //     // 4. Both business name and 2nd address line exist
+        //     $delivery_address['address2'] = $business_name;
+        //     $delivery_address['address3'] = $shipping_address['address_1'];
+        //     $delivery_address['address4'] = $shipping_address['address_2'];
+        //     $delivery_address['address5'] = $shipping_address['city'] . ' ' . $shipping_address['state'];
+        // }
         $delivery_address = [
             'address1' => strtoupper($order->get_shipping_first_name() . ' ' . $order->get_shipping_last_name()),
             'address2' => '',
@@ -635,27 +667,30 @@ class WCOSPA_Order_Data_Formatter
             'phone' => $order->get_billing_phone(),
         ];
 
-        // Apply the conditions to modify the delivery address
+                // Apply the conditions to modify the delivery address
         if (empty($business_name) && empty($shipping_address['address_2'])) {
             // 1. No business name and no 2nd address line
             $delivery_address['address2'] = $shipping_address['address_1'];
-            $delivery_address['address3'] = $shipping_address['city'] . ' ' . $shipping_address['state'];
+            $delivery_address['address3'] = $shipping_address['city'].' '.$shipping_address['state'];
+            $delivery_address['address4'] = $shipping_address['country'];
         } elseif (empty($business_name) && !empty($shipping_address['address_2'])) {
             // 2. No business name, but 2nd address line exists
             $delivery_address['address2'] = $shipping_address['address_1'];
             $delivery_address['address3'] = $shipping_address['address_2'];
-            $delivery_address['address4'] = $shipping_address['city'] . ' ' . $shipping_address['state'];
+            $delivery_address['address4'] = $shipping_address['city'].' '.$shipping_address['state'];
+            $delivery_address['address5'] = $shipping_address['country'];
         } elseif (!empty($business_name) && empty($shipping_address['address_2'])) {
             // 3. Business name exists, but no 2nd address line
             $delivery_address['address2'] = $business_name;
             $delivery_address['address3'] = $shipping_address['address_1'];
-            $delivery_address['address4'] = $shipping_address['city'] . ' ' . $shipping_address['state'];
+            $delivery_address['address4'] = $shipping_address['city'].' '.$shipping_address['state'];
+            $delivery_address['address5'] = $shipping_address['country'];
         } elseif (!empty($business_name) && !empty($shipping_address['address_2'])) {
             // 4. Both business name and 2nd address line exist
             $delivery_address['address2'] = $business_name;
             $delivery_address['address3'] = $shipping_address['address_1'];
             $delivery_address['address4'] = $shipping_address['address_2'];
-            $delivery_address['address5'] = $shipping_address['city'] . ' ' . $shipping_address['state'];
+            $delivery_address['address5'] = $shipping_address['city'].' '.$shipping_address['state'].', '.$shipping_address['country'];
         }
 
         // Get payment method from the order
@@ -669,7 +704,8 @@ class WCOSPA_Order_Data_Formatter
         // Return the formatted order data
         return [
             'customer_reference' => $customer_reference,
-            'debtor' => '210942',
+            'debtor' => 'INTWEB',
+            // 'debtor' => '210942',
             'delivery_address' => $delivery_address,
             'delivery_instructions' => $delivery_instructions,
             'payment' => [
@@ -689,7 +725,7 @@ class WCOSPA_Order_Data_Formatter
 
         // Correct payment method mapping
         $payment_mapping = [
-            'ppcp' => 'PP',          // PayPal
+            'ppcp' => 'PP', // PayPal
             'afterpay' => 'CC', // AfterPay
             'stripe_cc' => 'CC', // Stripe Credit Card
         ];

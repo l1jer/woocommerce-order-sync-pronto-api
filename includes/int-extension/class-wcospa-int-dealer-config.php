@@ -27,6 +27,42 @@ class WCOSPA_INT_Dealer_Config {
     private const DEFAULT_DEALER_EMAIL = 'jerry@tasco.com.au';
 
     /**
+     * @var array Timezone mapping for each country
+     */
+    private const COUNTRY_TIMEZONES = [
+        'AR' => 'America/Argentina/Buenos_Aires', // Argentina
+        'AT' => 'Europe/Vienna',                  // Austria
+        'BY' => 'Europe/Minsk',                   // Belarus
+        'BE' => 'Europe/Brussels',                // Belgium
+        'BA' => 'Europe/Sarajevo',                // Bosnia and Herzegovina
+        'DK' => 'Europe/Copenhagen',              // Denmark
+        'FI' => 'Europe/Helsinki',                // Finland
+        'FR' => 'Europe/Paris',                   // France
+        'DE' => 'Europe/Berlin',                  // Germany
+        'GR' => 'Europe/Athens',                  // Greece
+        'HU' => 'Europe/Budapest',                // Hungary
+        'IE' => 'Europe/Dublin',                  // Ireland
+        'IT' => 'Europe/Rome',                    // Italy
+        'JP' => 'Asia/Tokyo',                     // Japan
+        'KP' => 'Asia/Pyongyang',                // Korea, Democratic People's Republic of
+        'KR' => 'Asia/Seoul',                    // Korea, Republic of
+        'LV' => 'Europe/Riga',                    // Latvia
+        'LT' => 'Europe/Vilnius',                 // Lithuania
+        'LU' => 'Europe/Luxembourg',              // Luxembourg
+        'MC' => 'Europe/Monaco',                  // Monaco
+        'NL' => 'Europe/Amsterdam',               // Netherlands
+        'NO' => 'Europe/Oslo',                    // Norway
+        'PL' => 'Europe/Warsaw',                  // Poland
+        'PT' => 'Europe/Lisbon',                  // Portugal
+        'RO' => 'Europe/Bucharest',               // Romania
+        'ES' => 'Europe/Madrid',                  // Spain
+        'SE' => 'Europe/Stockholm',               // Sweden
+        'CH' => 'Europe/Zurich',                  // Switzerland
+        'UA' => 'Europe/Kiev',                    // Ukraine
+        'GB' => 'Europe/London'                   // United Kingdom
+    ];
+
+    /**
      * Constructor
      */
     public function __construct() {
@@ -58,9 +94,36 @@ class WCOSPA_INT_Dealer_Config {
     private function create_default_config(): void {
         $default_config = [
             'dealers' => [
-                'AU' => ['email' => self::DEFAULT_DEALER_EMAIL],
-                'NZ' => ['email' => self::DEFAULT_DEALER_EMAIL],
-                // Add more countries as needed
+                'AR' => ['email' => self::DEFAULT_DEALER_EMAIL], // Argentina
+                'AT' => ['email' => self::DEFAULT_DEALER_EMAIL], // Austria
+                'BY' => ['email' => self::DEFAULT_DEALER_EMAIL], // Belarus
+                'BE' => ['email' => self::DEFAULT_DEALER_EMAIL], // Belgium
+                'BA' => ['email' => self::DEFAULT_DEALER_EMAIL], // Bosnia and Herzegovina
+                'DK' => ['email' => self::DEFAULT_DEALER_EMAIL], // Denmark
+                'FI' => ['email' => self::DEFAULT_DEALER_EMAIL], // Finland
+                'FR' => ['email' => self::DEFAULT_DEALER_EMAIL], // France
+                'DE' => ['email' => self::DEFAULT_DEALER_EMAIL], // Germany
+                'GR' => ['email' => self::DEFAULT_DEALER_EMAIL], // Greece
+                'HU' => ['email' => self::DEFAULT_DEALER_EMAIL], // Hungary
+                'IE' => ['email' => self::DEFAULT_DEALER_EMAIL], // Ireland
+                'IT' => ['email' => self::DEFAULT_DEALER_EMAIL], // Italy
+                'JP' => ['email' => self::DEFAULT_DEALER_EMAIL], // Japan
+                'KP' => ['email' => self::DEFAULT_DEALER_EMAIL], // Korea, Democratic People's Republic of
+                'KR' => ['email' => self::DEFAULT_DEALER_EMAIL], // Korea, Republic of
+                'LV' => ['email' => self::DEFAULT_DEALER_EMAIL], // Latvia
+                'LT' => ['email' => self::DEFAULT_DEALER_EMAIL], // Lithuania
+                'LU' => ['email' => self::DEFAULT_DEALER_EMAIL], // Luxembourg
+                'MC' => ['email' => self::DEFAULT_DEALER_EMAIL], // Monaco
+                'NL' => ['email' => self::DEFAULT_DEALER_EMAIL], // Netherlands
+                'NO' => ['email' => self::DEFAULT_DEALER_EMAIL], // Norway
+                'PL' => ['email' => self::DEFAULT_DEALER_EMAIL], // Poland
+                'PT' => ['email' => self::DEFAULT_DEALER_EMAIL], // Portugal
+                'RO' => ['email' => self::DEFAULT_DEALER_EMAIL], // Romania
+                'ES' => ['email' => self::DEFAULT_DEALER_EMAIL], // Spain
+                'SE' => ['email' => self::DEFAULT_DEALER_EMAIL], // Sweden
+                'CH' => ['email' => self::DEFAULT_DEALER_EMAIL], // Switzerland
+                'UA' => ['email' => self::DEFAULT_DEALER_EMAIL], // Ukraine
+                'GB' => ['email' => self::DEFAULT_DEALER_EMAIL]  // United Kingdom
             ],
             'default_email' => self::DEFAULT_DEALER_EMAIL
         ];
@@ -135,5 +198,16 @@ class WCOSPA_INT_Dealer_Config {
      */
     public function get_all_dealers(): array {
         return $this->dealer_config['dealers'];
+    }
+
+    /**
+     * Get timezone for a specific country
+     *
+     * @param string $country_code Two-letter country code
+     * @return string Timezone identifier
+     */
+    public function get_dealer_timezone(string $country_code): string {
+        $country_code = strtoupper($country_code);
+        return self::COUNTRY_TIMEZONES[$country_code] ?? 'Europe/London';
     }
 } 

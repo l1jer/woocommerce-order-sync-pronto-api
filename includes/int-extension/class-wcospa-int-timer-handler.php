@@ -28,10 +28,9 @@ class WCOSPA_INT_Timer_Handler {
         // Add timer check to WordPress cron
         add_action('init', [$this, 'schedule_timer_check']);
         add_action('wcospa_int_check_timers', [$this, 'check_timers']);
-
-        // Add shipping responder column
-        add_filter('manage_edit-shop_order_columns', [$this, 'add_shipping_responder_column']);
-        add_action('manage_shop_order_posts_custom_column', [$this, 'render_shipping_responder_column']);
+        
+        // Clean up shipping responder data
+        $this->cleanup_shipping_responder_data();
     }
 
     /**
@@ -173,43 +172,6 @@ class WCOSPA_INT_Timer_Handler {
     }
 
     /**
-     * Add shipping responder column to orders list
-     */
-    public function add_shipping_responder_column(array $columns): array {
-        $columns['shipping_responder'] = __('Shipping Responder', 'wcospa');
-        return $columns;
-    }
-
-    /**
-     * Render shipping responder column content
-     */
-    public function render_shipping_responder_column(string $column): void {
-        global $post;
-
-        if ($column === 'shipping_responder') {
-            $order = wc_get_order($post->ID);
-            if ($order) {
-                $responder = $order->get_meta('_wcospa_int_shipping_responder');
-                echo $responder ? esc_html($responder) : '';
-            }
-        }
-    }
-
-    /**
-     * Start shipping timer for an order
-     */
-    public function start_shipping_timer(int $order_id): void {
-        $start_time = time();
-        update_post_meta($order_id, '_wcospa_int_shipping_timer', $start_time);
-        
-        $this->log_debug(sprintf(
-            'Started shipping timer for order #%d at %s (48-hour countdown)',
-            $order_id,
-            date('Y-m-d H:i:s', $start_time)
-        ));
-    }
-
-    /**
      * Mark order as shipped
      */
     public function mark_as_shipped(int $order_id): void {
@@ -219,13 +181,31 @@ class WCOSPA_INT_Timer_Handler {
         }
 
         $order->update_meta_data('_wcospa_int_shipped', true);
-        $order->update_meta_data('_wcospa_int_shipping_responder', 'Dealer');
         $order->save();
 
         // Remove shipping timer
         delete_post_meta($order_id, '_wcospa_int_shipping_timer');
         
         $this->log_debug(sprintf('Order #%d marked as shipped by dealer, timer cleared', $order_id));
+    }
+
+    /**
+     * Clean up shipping responder data from the database
+     */
+    private function cleanup_shipping_responder_data(): void {
+        global $wpdb;
+
+        // Get all orders with shipping responder meta
+        $orders = $wpdb->get_results(
+            "SELECT post_id FROM {$wpdb->postmeta} WHERE meta_key = '_wcospa_int_shipping_responder'"
+        );
+
+        if (!empty($orders)) {
+            foreach ($orders as $order) {
+                delete_post_meta($order->post_id, '_wcospa_int_shipping_responder');
+                $this->log_debug(sprintf('Cleaned up shipping responder data for order #%d', $order->post_id));
+            }
+        }
     }
 
     /**
