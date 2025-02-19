@@ -102,12 +102,18 @@ class WCOSPA_Order_Handler
      *
      * @param int $order_id The WooCommerce order ID
      */
-    public static function handle_order_sync($order_id)
+    public static function handle_order_sync($order_id): void
     {
-        // Check if auto sync is allowed
-        if (!apply_filters('wcospa_allow_auto_sync', false) && !did_action('wcospa_sync_order')) {
+        $order = wc_get_order($order_id);
+        if (!$order) {
             return;
         }
+
+        // Log the sync attempt
+        wc_get_logger()->debug(
+            sprintf('Attempting to sync order #%d to Pronto', $order_id),
+            ['source' => 'wcospa']
+        );
         
         $response = WCOSPA_API_Client::sync_order($order_id);
 
@@ -117,7 +123,6 @@ class WCOSPA_Order_Handler
                 ['source' => 'wcospa']
             );
         } else {
-            $order = wc_get_order($order_id);
             $order->update_status('wc-pronto-received', 'Order marked as Pronto Received after successful API sync.');
             
             // Store transaction UUID and sync time

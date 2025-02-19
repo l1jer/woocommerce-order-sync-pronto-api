@@ -1,6 +1,6 @@
 # Project Extension Instructions
 
-## Pre-Requisites
+### Pre-Requisites
 
 - **Review Code:** Analyze all project files and code.
 - General Requirements
@@ -16,7 +16,7 @@
   - Ensure all files are loaded correctly and definately
   - Creat individual folder for this extension
 
-## Step 1: JSON File for Dealers
+~~### Step 1: JSON File for Dealers~~
 
 - **Objective:** Create a JSON file that lists countries with associated dealer emails.
 - Prevent automatic progression from "Processing" to "Pronto Received".
@@ -24,7 +24,7 @@
   - Each country must have a dealer email.
   - Default email: `jerry@tasco.com.au`.
 
-## Step 2: New Order Email Notification
+~~### Step 2: New Order Email Notification~~
 
 - **Objective:** Replace POST requests to Pronto with email notifications.
 - **Details:**
@@ -38,7 +38,7 @@
     - **Accept & Fulfill** (records acceptance in order meta data)
     - **Decline Order** (records decline in order meta data)
 
-## Step 3: Order Reception & Dealer Workflow
+~~### Step 3: Order Reception & Dealer Workflow~~
 
 - **Objective:** Implement a dealer-driven order processing workflow.
 - **Details:**
@@ -66,13 +66,45 @@
       - Update order status to "Email Dealer Failed" and stop further actions.
 
 
+### Step 4: Fixing Guest Access for Accept/Reject URLs
 
-step 4: http://zt-int-staging.local/?action=wcospa\_int\_accept\_order&order\_id=21744&nonce=a3ed663fec
+- **Issue:**
 
-It says "Invalid request." where I use incognito mode to this accept button/reject button. For those dealers who have no account on our website, so those urls from both "accept" and "reject" buttons need to be working for guest/non-login users. Reveiw this issue, identify the problems, then fix it with caution in the best practice.
+  - Clicking the "Accept" or "Reject" button in incognito mode results in an "Invalid request" error.
+  - Dealers without an account cannot use the provided links.
+- **Solution:**
 
-step 5: If the order has received "accept" or "reject" signal, the links in the email will not work anymore, which is saying, "accept" and "reject buttons in one email(in one order) only can be taken action once, e.g. "accept" button been clicked, then the "reject" button(the reject url) will be not working, even the "accept" button cannot be click again to send signal to website api, instead, when clicked it will say "you have already accepted/rejected order xxx at time of xx:xx xx/xx/xxxx, if there is further request please contact jheads@zerotech.com.au"
+  - Review and identify the issue preventing guest access.
+  - Ensure that the URLs from "Accept" and "Reject" buttons function correctly for non-logged-in users.
+  - Implement a secure yet accessible verification method to allow guest users to take action.
+  - Apply best practices to prevent unauthorized access while ensuring the URLs remain functional.
 
-step 6:. When Decline been clicked and signal sent to website api, trigger the process of sync the order to Pronto then change the order status to Pronto Received
+### ~~Step 5: Prevent Multiple Actions on Accept/Reject Buttons~~
 
-step 7:
+- **Requirement:**
+
+  - The "Accept" and "Reject" buttons in a single order email must be actionable only once.
+  - After an action is taken, both buttons should become inactive.
+- **Implementation:**
+
+  - Once an order is accepted or rejected, disable further API calls via the links.
+  - Clicking an already-used link should display:
+    - `"You have already accepted/rejected order XXX at XX:XX on XX/XX/XXXX. If further action is needed, please contact jheads@zerotech.com.au."`
+  - Ensure backend validation prevents duplicate actions, even if the URL is accessed again.
+
+~~### Step 6: Sync Order to Pronto on Rejection~~
+
+- **Requirement:**
+
+  - If the "Decline" button is clicked, trigger an automatic order sync to Pronto.
+  - Update the order status accordingly.
+- **Implementation:**
+
+  - When the "Reject" action is confirmed:
+    - Sync the order data with Pronto.
+    - Update the order status to `"Pronto Received"`.
+  - Ensure this process is error-handled and logged for tracking.
+
+step 7: update redirect page after ACCEPT/DECLINE the order
+
+* Show order number and billing name has been accepted/declined at XX:XX, XX/XX/XXXX (using the dealer local time) also show AUS EASTERN Standard time

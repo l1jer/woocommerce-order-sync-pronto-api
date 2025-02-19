@@ -294,19 +294,62 @@ class WCOSPA_INT_Email_Handler {
      *
      * @param int $order_id Order ID
      * @param string $action Action type (accept/decline)
-     * @return string Secure URL with nonce
+     * @return string Secure URL with token
      */
     private function generate_action_url(int $order_id, string $action): string {
-        $nonce = wp_create_nonce("wcospa_int_{$action}_{$order_id}");
+        // Generate a secure token using order ID, action, and a secret key
+        $secret_key = defined('WCOSPA_INT_SECRET_KEY') ? WCOSPA_INT_SECRET_KEY : wp_salt('auth');
+        $timestamp = time();
+        $token_data = sprintf('%d|%s|%d', $order_id, $action, $timestamp);
+        $token = hash_hmac('sha256', $token_data, $secret_key);
+        
+        // Store the token and timestamp in order meta
+        update_post_meta($order_id, "_wcospa_int_{$action}_token", $token);
+        update_post_meta($order_id, "_wcospa_int_{$action}_timestamp", $timestamp);
+
         $url = add_query_arg([
             'action' => $action,
             'order_id' => $order_id,
-            'nonce' => $nonce
+            'token' => $token,
+            'ts' => $timestamp
         ], home_url('/'));
 
         $this->log_debug(sprintf('Generated action URL for order #%d: %s', $order_id, $url));
 
         return $url;
+    }
+
+    /**
+     * Verify action token
+     *
+     * @param int $order_id Order ID
+     * @param string $action Action type
+     * @param string $token Token to verify
+     * @param int $timestamp Timestamp when token was generated
+     * @return bool Whether the token is valid
+     */
+    public function verify_action_token(int $order_id, string $action, string $token, int $timestamp): bool {
+        // Check if token has expired (48 hours)
+        if (time() - $timestamp > 48 * 60 * 60) {
+            $this->log_debug(sprintf('Token expired for order #%d action: %s', $order_id, $action));
+            return false;
+        }
+
+        // Get stored token
+        $stored_token = get_post_meta($order_id, "_wcospa_int_{$action}_token", true);
+        $stored_timestamp = (int) get_post_meta($order_id, "_wcospa_int_{$action}_timestamp", true);
+
+        if (empty($stored_token) || $stored_timestamp !== $timestamp) {
+            $this->log_debug(sprintf('Token mismatch for order #%d action: %s', $order_id, $action));
+            return false;
+        }
+
+        // Verify token
+        $secret_key = defined('WCOSPA_INT_SECRET_KEY') ? WCOSPA_INT_SECRET_KEY : wp_salt('auth');
+        $token_data = sprintf('%d|%s|%d', $order_id, $action, $timestamp);
+        $expected_token = hash_hmac('sha256', $token_data, $secret_key);
+
+        return hash_equals($expected_token, $token);
     }
 
     /**

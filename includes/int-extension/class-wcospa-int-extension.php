@@ -118,14 +118,7 @@ class WCOSPA_INT_Extension {
             return;
         }
 
-        // Check if this is an international order
-        $shipping_country = $order->get_shipping_country();
-        if ($shipping_country === 'AU') {
-            $this->log_debug(sprintf('Order #%d is domestic (AU), skipping INT handling', $order_id));
-            return;
-        }
-
-        $this->log_debug(sprintf('Processing international order #%d for country: %s', $order_id, $shipping_country));
+        $this->log_debug(sprintf('Processing international order #%d', $order_id));
 
         // Prevent order from being processed by Pronto sync
         update_post_meta($order_id, '_wcospa_prevent_pronto_sync', 'yes');
@@ -185,7 +178,7 @@ class WCOSPA_INT_Extension {
     }
 
     /**
-     * Check if order is international and set prevention flag early
+     * Set prevention flags for all orders as they are all international
      */
     public function check_international_order(int $order_id): void {
         $order = wc_get_order($order_id);
@@ -193,59 +186,80 @@ class WCOSPA_INT_Extension {
             return;
         }
 
-        $shipping_country = $order->get_shipping_country();
-        if ($shipping_country !== 'AU') {
-            update_post_meta($order_id, '_wcospa_prevent_pronto_sync', 'yes');
-            update_post_meta($order_id, '_wcospa_is_international', 'yes');
-        }
+        // All orders are international in this branch
+        update_post_meta($order_id, '_wcospa_prevent_pronto_sync', 'yes');
+        update_post_meta($order_id, '_wcospa_is_international', 'yes');
     }
 
     /**
      * Prevent automatic progression from "Processing" to "Pronto Received"
+     * Always returns false as all orders require dealer decision
      */
     public function prevent_auto_pronto_sync(bool $should_process, WC_Order $order): bool {
-        // Early check for international orders
-        if (get_post_meta($order->get_id(), '_wcospa_is_international', true) === 'yes') {
-            return false;
-        }
-
-        // Check shipping country
-        $shipping_country = $order->get_shipping_country();
-        if ($shipping_country !== 'AU') {
-            update_post_meta($order->get_id(), '_wcospa_prevent_pronto_sync', 'yes');
-            update_post_meta($order->get_id(), '_wcospa_is_international', 'yes');
-            return false;
-        }
-
-        // Check if explicitly set to prevent sync
-        if (get_post_meta($order->get_id(), '_wcospa_prevent_pronto_sync', true) === 'yes') {
-            return false;
-        }
-
-        return $should_process;
+        return false;
     }
 
     /**
      * Handle dealer response to order
      */
     public function handle_dealer_response(): void {
-        if (!isset($_GET['action'], $_GET['order_id'], $_GET['nonce'])) {
+        if (!isset($_GET['action'], $_GET['order_id'], $_GET['token'], $_GET['ts'])) {
             return;
         }
 
         $action = sanitize_text_field($_GET['action']);
         $order_id = (int) $_GET['order_id'];
-        $nonce = sanitize_text_field($_GET['nonce']);
+        $token = sanitize_text_field($_GET['token']);
+        $timestamp = (int) $_GET['ts'];
 
-        // Verify nonce
-        if (!wp_verify_nonce($nonce, "wcospa_int_{$action}_{$order_id}")) {
-            wp_die(__('Invalid request.', 'wcospa'));
+        // Verify token using email handler
+        if (!$this->email_handler->verify_action_token($order_id, $action, $token, $timestamp)) {
+            $this->log_debug(sprintf('Invalid token for order #%d action: %s', $order_id, $action));
+            wp_die(
+                __('This link has expired or is invalid. Please contact support if you need assistance.', 'wcospa'),
+                __('Access Denied', 'wcospa'),
+                ['response' => 403, 'back_link' => false]
+            );
         }
 
         $order = wc_get_order($order_id);
         if (!$order) {
-            wp_die(__('Order not found.', 'wcospa'));
+            $this->log_debug(sprintf('Order #%d not found', $order_id));
+            wp_die(
+                __('Order not found. Please contact support if you need assistance.', 'wcospa'),
+                __('Order Not Found', 'wcospa'),
+                ['response' => 404, 'back_link' => false]
+            );
         }
+
+        // Check if order has already been actioned
+        $dealer_response = $order->get_meta('_wcospa_int_dealer_response');
+        if ($dealer_response) {
+            $response_time = $order->get_meta('_wcospa_int_dealer_response_time');
+            $formatted_time = $response_time ? wp_date('H:i \o\n d/m/Y', (int) $response_time) : 'unknown time';
+            
+            $this->log_debug(sprintf(
+                'Order #%d already actioned (%s) at %s',
+                $order_id,
+                $dealer_response,
+                $formatted_time
+            ));
+
+            wp_die(
+                sprintf(
+                    __('You have already %s order #%s at %s. If further action is needed, please contact jheads@zerotech.com.au.', 'wcospa'),
+                    $dealer_response === 'accepted' ? 'accepted' : 'rejected',
+                    $order->get_order_number(),
+                    $formatted_time
+                ),
+                __('Action Already Taken', 'wcospa'),
+                ['response' => 403, 'back_link' => false]
+            );
+        }
+
+        // Clean up used token
+        delete_post_meta($order_id, "_wcospa_int_{$action}_token");
+        delete_post_meta($order_id, "_wcospa_int_{$action}_timestamp");
 
         $this->log_debug(sprintf('Processing dealer response for order #%d: %s', $order_id, $action));
 
@@ -253,6 +267,7 @@ class WCOSPA_INT_Extension {
             case 'wcospa_int_accept_order':
                 $order->update_status('dealer-accept', __('Order accepted by dealer.', 'wcospa'));
                 $order->update_meta_data('_wcospa_int_dealer_response', 'accepted');
+                $order->update_meta_data('_wcospa_int_dealer_response_time', time());
                 $order->save();
 
                 // Start shipping timer
@@ -263,16 +278,21 @@ class WCOSPA_INT_Extension {
                 exit;
 
             case 'wcospa_int_decline_order':
+                // Update order status and metadata
+                $order->update_status('processing', __('Order declined by dealer, proceeding with Pronto sync.', 'wcospa'));
                 $order->update_meta_data('_wcospa_int_dealer_response', 'declined');
+                $order->update_meta_data('_wcospa_int_dealer_response_time', time());
                 $order->save();
-                $this->log_debug(sprintf('Order #%d declined by dealer, triggering Pronto sync', $order_id));
                 
-                // Remove prevention flag before triggering sync
+                $this->log_debug(sprintf('Order #%d declined by dealer, proceeding to Pronto sync', $order_id));
+                
+                // Remove prevention flags and trigger sync
                 delete_post_meta($order_id, '_wcospa_prevent_pronto_sync');
                 delete_post_meta($order_id, '_wcospa_is_international');
                 
-                // Trigger Pronto sync for declined orders
-                do_action('wcospa_sync_order', $order_id);
+                // Manually handle the sync instead of using action
+                WCOSPA_Order_Handler::handle_order_sync($order_id);
+                
                 wp_safe_redirect(home_url('/order-declined'));
                 exit;
         }
