@@ -172,6 +172,21 @@ class WCOSPA_INT_Timer_Handler {
     }
 
     /**
+     * Start shipping timer for an order
+     */
+    public function start_shipping_timer(int $order_id): void {
+        $order = wc_get_order($order_id);
+        if (!$order) {
+            return;
+        }
+
+        // Set shipping timer start time
+        update_post_meta($order_id, '_wcospa_int_shipping_timer', time());
+        
+        $this->log_debug(sprintf('Started shipping timer for order #%d', $order_id));
+    }
+
+    /**
      * Mark order as shipped
      */
     public function mark_as_shipped(int $order_id): void {

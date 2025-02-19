@@ -168,17 +168,26 @@ class WCOSPA_INT_Email_Handler {
         // Prepare email content
         $subject = sprintf(__('New Order #%s Requires Your Attention', 'wcospa'), $order->get_order_number());
         
-        // Get order details
-        $order_date_utc = $order->get_date_created()->format('Y-m-d H:i:s T');
-        $order_date_sydney = (new DateTime($order_date_utc))
-            ->setTimezone(new DateTimeZone('Australia/Sydney'))
-            ->format('Y-m-d H:i:s T');
+        // Get order details and timezone information
+        $order_date = $order->get_date_created();
+        $dealer_timezone = $this->dealer_config->get_dealer_timezone($shipping_country);
+        
+        // Convert to dealer's local time
+        $dealer_time = clone $order_date;
+        $dealer_time->setTimezone(new DateTimeZone($dealer_timezone));
+        $order_date_dealer = $dealer_time->format('H:i \o\n d/m/Y (T)');
+
+        // Convert to Sydney time
+        $sydney_time = clone $order_date;
+        $sydney_time->setTimezone(new DateTimeZone(WCOSPA_Utils::SYDNEY_TIMEZONE));
+        $order_date_sydney = $sydney_time->format('H:i \o\n d/m/Y (T)');
 
         // Build HTML email content
         $message = $this->get_email_template($order, [
             'order_number' => $order->get_order_number(),
-            'order_date_utc' => $order_date_utc,
+            'order_date_dealer' => $order_date_dealer,
             'order_date_sydney' => $order_date_sydney,
+            'dealer_timezone' => $dealer_timezone,
             'accept_url' => $accept_url,
             'decline_url' => $decline_url
         ]);
@@ -240,8 +249,8 @@ class WCOSPA_INT_Email_Handler {
 
                 <table style="width: 100%; margin-bottom: 30px;">
                     <tr>
-                        <th style="text-align: left; padding: 10px;"><?php _e('Order Date (UTC):', 'wcospa'); ?></th>
-                        <td style="text-align: left; padding: 10px;"><?php echo esc_html($data['order_date_utc']); ?></td>
+                        <th style="text-align: left; padding: 10px;"><?php _e('Order Date (Dealer):', 'wcospa'); ?></th>
+                        <td style="text-align: left; padding: 10px;"><?php echo esc_html($data['order_date_dealer']); ?></td>
                     </tr>
                     <tr>
                         <th style="text-align: left; padding: 10px;"><?php _e('Order Date (Sydney):', 'wcospa'); ?></th>

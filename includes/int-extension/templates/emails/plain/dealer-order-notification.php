@@ -13,10 +13,29 @@ echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=\n\n";
 echo sprintf(esc_html__('Order #%s Details', 'wcospa'), $order->get_order_number()) . "\n\n";
 
 // Get order dates
-$order_date_utc = $order->get_date_created()->format('Y-m-d H:i:s T');
-$order_date_sydney = (new DateTime($order_date_utc))->setTimezone(new DateTimeZone('Australia/Sydney'))->format('Y-m-d H:i:s T');
+$order_date = $order->get_date_created();
+$shipping_country = $order->get_shipping_country();
 
-echo esc_html__('Order Date (UTC):', 'wcospa') . ' ' . $order_date_utc . "\n";
+// Get dealer configuration and timezone
+$dealers = isset($dealer_config) ? $dealer_config : [];
+$dealer_name = isset($dealers[$shipping_country]['name']) ? $dealers[$shipping_country]['name'] : $shipping_country;
+$dealer_timezone = isset($dealers[$shipping_country]['timezone']) 
+    ? $dealers[$shipping_country]['timezone'] 
+    : WCOSPA_INT_Dealer_Config::COUNTRY_TIMEZONES[$shipping_country] ?? 'Europe/London';
+
+$sydney_timezone = new DateTimeZone('Australia/Sydney');
+
+// Convert to dealer's local time
+$dealer_time = clone $order_date;
+$dealer_time->setTimezone(new DateTimeZone($dealer_timezone));
+$order_date_dealer = $dealer_time->format('H:i \o\n d/m/Y (T)');
+
+// Convert to Sydney time
+$sydney_time = clone $order_date;
+$sydney_time->setTimezone($sydney_timezone);
+$order_date_sydney = $sydney_time->format('H:i \o\n d/m/Y (T)');
+
+echo esc_html__('Order Date (Dealer Time):', 'wcospa') . ' ' . $order_date_dealer . "\n";
 echo esc_html__('Order Date (Sydney):', 'wcospa') . ' ' . $order_date_sydney . "\n\n";
 
 // Order details

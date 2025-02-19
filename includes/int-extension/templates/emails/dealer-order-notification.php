@@ -31,8 +31,29 @@ do_action('woocommerce_email_customer_details', $order, $sent_to_admin, $plain_t
 // Get order details for display
 $order_id = $order->get_id();
 $order_number = $order->get_order_number();
-$order_date_utc = $order->get_date_created()->format('Y-m-d H:i:s T');
-$order_date_sydney = (new DateTime($order_date_utc))->setTimezone(new DateTimeZone('Australia/Sydney'))->format('Y-m-d H:i:s T');
+
+// Get the order date and timezone information
+$order_date = $order->get_date_created();
+$shipping_country = $order->get_shipping_country();
+
+// Get dealer configuration and timezone
+$dealers = isset($dealer_config) ? $dealer_config : [];
+$dealer_name = isset($dealers[$shipping_country]['name']) ? $dealers[$shipping_country]['name'] : $shipping_country;
+$dealer_timezone = isset($dealers[$shipping_country]['timezone']) 
+    ? $dealers[$shipping_country]['timezone'] 
+    : WCOSPA_INT_Dealer_Config::COUNTRY_TIMEZONES[$shipping_country] ?? 'Europe/London';
+
+$sydney_timezone = new DateTimeZone('Australia/Sydney');
+
+// Convert to dealer's local time
+$dealer_time = clone $order_date;
+$dealer_time->setTimezone(new DateTimeZone($dealer_timezone));
+$order_date_dealer_formatted = $dealer_time->format('H:i \o\n d/m/Y (T)');
+
+// Convert to Sydney time
+$sydney_time = clone $order_date;
+$sydney_time->setTimezone($sydney_timezone);
+$order_date_sydney_formatted = $sydney_time->format('H:i \o\n d/m/Y (T)');
 
 // Get customer details
 $billing_first_name = $order->get_billing_first_name();
@@ -52,12 +73,12 @@ $show_shipping = $shipping_address !== $billing_address;
     
     <table class="td" cellspacing="0" cellpadding="6" style="width: 100%; margin-bottom: 20px;">
         <tr>
-            <th scope="row" style="text-align:left;"><?php esc_html_e('Order Date (UTC):', 'wcospa'); ?></th>
-            <td style="text-align:left;"><?php echo esc_html($order_date_utc); ?></td>
+            <th scope="row" style="text-align:left;"><?php esc_html_e('Order Date (Dealer Time):', 'wcospa'); ?></th>
+            <td style="text-align:left;"><?php echo esc_html($order_date_dealer_formatted); ?></td>
         </tr>
         <tr>
             <th scope="row" style="text-align:left;"><?php esc_html_e('Order Date (Sydney):', 'wcospa'); ?></th>
-            <td style="text-align:left;"><?php echo esc_html($order_date_sydney); ?></td>
+            <td style="text-align:left;"><?php echo esc_html($order_date_sydney_formatted); ?></td>
         </tr>
     </table>
 

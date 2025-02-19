@@ -33,16 +33,14 @@ $dealer_email = $order->get_meta('_wcospa_int_dealer_email');
 
 <table class="td" cellspacing="0" cellpadding="6" style="width: 100%; margin-bottom: 20px;">
     <tr>
-        <th style="text-align: left; padding: 10px;"><?php esc_html_e('Sydney Time:', 'wcospa'); ?></th>
-        <td style="text-align: left; padding: 10px;"><?php echo esc_html($sydney_time); ?></td>
-    </tr>
-    <tr>
         <th style="text-align: left; padding: 10px;"><?php esc_html_e('Dealer Local Time:', 'wcospa'); ?></th>
         <td style="text-align: left; padding: 10px;"><?php echo esc_html($dealer_time); ?> (<?php echo esc_html($dealer_timezone); ?>)</td>
     </tr>
+    <tr>
+        <th style="text-align: left; padding: 10px;"><?php esc_html_e('Sydney Time:', 'wcospa'); ?></th>
+        <td style="text-align: left; padding: 10px;"><?php echo esc_html($sydney_time); ?></td>
+    </tr>
 </table>
-
-<h2><?php esc_html_e('Order Details', 'wcospa'); ?></h2>
 
 <?php
 /*
@@ -66,4 +64,4 @@ do_action('woocommerce_email_customer_details', $order, $sent_to_admin, $plain_t
 /*
  * @hooked WC_Emails::email_footer() Output the email footer
  */
-do_action('woocommerce_email_footer', $email); 
+do_action('woocommerce_email_footer', $email);

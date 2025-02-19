@@ -88,8 +88,8 @@ class WCOSPA_INT_Extension {
         // Handle order status transitions
         add_action('woocommerce_order_status_changed', [$this, 'handle_order_status_change'], 10, 4);
 
-        // Handle dealer response actions
-        add_action('init', [$this, 'handle_dealer_response']);
+        // Handle dealer response actions - moved to wp_loaded to ensure WooCommerce is fully initialized
+        add_action('wp_loaded', [$this, 'handle_dealer_response']);
 
         // Add debug column to orders list
         add_filter('manage_edit-shop_order_columns', [$this, 'add_order_list_columns']);
@@ -113,11 +113,12 @@ class WCOSPA_INT_Extension {
             $new_status
         ));
 
-        // Only handle processing status
-        if ($new_status !== 'processing') {
+        // Only process orders transitioning to 'processing'
+        if ($new_status !== 'processing' || $old_status === 'await-dealer') {
             return;
         }
 
+        // Check if this is an international order
         $this->log_debug(sprintf('Processing international order #%d', $order_id));
 
         // Prevent order from being processed by Pronto sync
@@ -186,9 +187,39 @@ class WCOSPA_INT_Extension {
             return;
         }
 
-        // All orders are international in this branch
-        update_post_meta($order_id, '_wcospa_prevent_pronto_sync', 'yes');
+        // Get shipping country and check if dealer exists
+        $shipping_country = $order->get_shipping_country();
+        $dealers = $this->dealer_config->get_all_dealers();
+        
+        // Mark as international order
         update_post_meta($order_id, '_wcospa_is_international', 'yes');
+        
+        if (isset($dealers[$shipping_country])) {
+            // Dealer exists - prevent Pronto sync and wait for dealer decision
+            update_post_meta($order_id, '_wcospa_prevent_pronto_sync', 'yes');
+            $this->log_debug(sprintf(
+                'Order #%d is for %s with assigned dealer %s',
+                $order_id,
+                $shipping_country,
+                $dealers[$shipping_country]['name']
+            ));
+        } else {
+            // No dealer for this country - proceed directly to Pronto sync
+            $this->log_debug(sprintf(
+                'Order #%d is for %s with no assigned dealer - proceeding directly to Pronto sync',
+                $order_id,
+                $shipping_country
+            ));
+            
+            // Add order note
+            $order->add_order_note(sprintf(
+                __('No dealer assigned for country %s. Order will be processed directly.', 'wcospa'),
+                $shipping_country
+            ));
+            
+            // Trigger Pronto sync
+            WCOSPA_Order_Handler::handle_order_sync($order_id);
+        }
     }
 
     /**
@@ -216,7 +247,7 @@ class WCOSPA_INT_Extension {
         if (!$this->email_handler->verify_action_token($order_id, $action, $token, $timestamp)) {
             $this->log_debug(sprintf('Invalid token for order #%d action: %s', $order_id, $action));
             wp_die(
-                __('This link has expired or is invalid. Please contact support if you need assistance.', 'wcospa'),
+                __('This link has expired or is invalid. Please contact us via jheads@zerotech.com.au if you need assistance.', 'wcospa'),
                 __('Access Denied', 'wcospa'),
                 ['response' => 403, 'back_link' => false]
             );
@@ -226,7 +257,7 @@ class WCOSPA_INT_Extension {
         if (!$order) {
             $this->log_debug(sprintf('Order #%d not found', $order_id));
             wp_die(
-                __('Order not found. Please contact support if you need assistance.', 'wcospa'),
+                __('Order not found. Please contact us via jheads@zerotech.com.au if you need assistance.', 'wcospa'),
                 __('Order Not Found', 'wcospa'),
                 ['response' => 404, 'back_link' => false]
             );
@@ -278,10 +309,11 @@ class WCOSPA_INT_Extension {
                 
                 // Handle redirect
                 $this->handle_response_redirect($order, 'accepted');
+                break;
 
             case 'wcospa_int_decline_order':
                 // Update order status and metadata
-                $order->update_status('processing', __('Order declined by dealer, proceeding with Pronto sync.', 'wcospa'));
+                $order->update_status('pronto-received', __('Order declined by dealer, proceeding with Pronto sync.', 'wcospa'));
                 $order->update_meta_data('_wcospa_int_dealer_response', 'declined');
                 $order->update_meta_data('_wcospa_int_dealer_response_time', time());
                 $order->save();
@@ -300,6 +332,7 @@ class WCOSPA_INT_Extension {
                 
                 // Handle redirect
                 $this->handle_response_redirect($order, 'declined');
+                break;
         }
     }
 
@@ -357,8 +390,8 @@ class WCOSPA_INT_Extension {
             $order = wc_get_order($post->ID);
             if ($order) {
                 $shipping_country = $order->get_shipping_country();
-                $dealer_config = $this->dealer_config->get_dealer_config($shipping_country);
-                echo esc_html($dealer_config['name'] ?? '');
+                $dealers = $this->dealer_config->get_all_dealers();
+                echo esc_html($dealers[$shipping_country]['name'] ?? '');
             }
         } elseif ($column === 'dealer_response_time') {
             $order = wc_get_order($post->ID);
@@ -439,7 +472,8 @@ class WCOSPA_INT_Extension {
         
         // Get dealer's timezone and configuration
         $dealer_timezone = $this->dealer_config->get_dealer_timezone($shipping_country);
-        $dealer_config = $this->dealer_config->get_dealer_config($shipping_country);
+        $dealers = $this->dealer_config->get_all_dealers();
+        $dealer_config = $dealers[$shipping_country] ?? [];
         
         // Format times for email using correct timezone
         $dealer_time = wp_date('H:i \o\n d/m/Y (T)', $response_time, new DateTimeZone($dealer_timezone));
@@ -502,45 +536,23 @@ class WCOSPA_INT_Extension {
         $dealer_time = wp_date('H:i \o\n d/m/Y (T)', $response_time, new DateTimeZone($dealer_timezone));
         $sydney_time = wp_date('H:i \o\n d/m/Y (T)', $response_time, new DateTimeZone('Australia/Sydney'));
         
-        // Store response data in transient for the response page
-        $transient_key = 'wcospa_response_' . $order->get_id();
-        set_transient($transient_key, [
-            'order_number' => $order->get_order_number(),
-            'billing_name' => $order->get_billing_first_name() . ' ' . $order->get_billing_last_name(),
-            'action' => $action,
-            'dealer_time' => $dealer_time,
-            'sydney_time' => $sydney_time,
-            'dealer_timezone' => $dealer_timezone,
-            'message' => sprintf(
-                __('Thank you for your response. Order #%s has been successfully %s.', 'wcospa'),
-                $order->get_order_number(),
-                $action === 'accepted' ? 'accepted' : 'declined'
-            ),
-            'details' => sprintf(
-                __('Action taken at: %s (Your time - %s) / %s (Sydney time)', 'wcospa'),
-                $dealer_time,
-                str_replace('_', ' ', $dealer_timezone),
-                $sydney_time
-            )
-        ], 300); // Store for 5 minutes
-        
-        $this->log_debug(sprintf(
-            'Redirecting to response page for order #%s (%s)',
-            $order->get_order_number(),
-            $action
-        ));
-
-        // Create response page content
-        ob_start();
+        // Output minimal response page without WooCommerce dependencies
+        header('Content-Type: text/html; charset=utf-8');
         ?>
         <!DOCTYPE html>
-        <html <?php language_attributes(); ?>>
+        <html>
         <head>
-            <meta charset="<?php bloginfo('charset'); ?>">
+            <meta charset="utf-8">
             <meta name="viewport" content="width=device-width, initial-scale=1">
             <title><?php echo esc_html(sprintf(__('Order %s Response', 'wcospa'), $action)); ?></title>
-            <?php wp_head(); ?>
             <style>
+                body {
+                    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
+                    line-height: 1.6;
+                    margin: 0;
+                    padding: 20px;
+                    background: #f0f0f1;
+                }
                 .wcospa-response {
                     max-width: 800px;
                     margin: 50px auto;
@@ -573,7 +585,7 @@ class WCOSPA_INT_Extension {
                     font-size: 48px;
                     margin-bottom: 20px;
                 }
-                .wcospa-response .icon.success {
+                .wcospa-response .icon.accepted {
                     color: #46b450;
                 }
                 .wcospa-response .icon.declined {
@@ -581,7 +593,7 @@ class WCOSPA_INT_Extension {
                 }
             </style>
         </head>
-        <body <?php body_class(); ?>>
+        <body>
             <div class="wcospa-response">
                 <div class="icon <?php echo esc_attr($action); ?>">
                     <?php echo $action === 'accepted' ? '✓' : '×'; ?>
@@ -608,14 +620,9 @@ class WCOSPA_INT_Extension {
                     )); ?>
                 </div>
             </div>
-            <?php wp_footer(); ?>
         </body>
         </html>
         <?php
-        $content = ob_get_clean();
-        
-        // Output the response page
-        echo $content;
         exit;
     }
 } 
