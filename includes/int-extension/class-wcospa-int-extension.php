@@ -509,7 +509,7 @@ class WCOSPA_INT_Extension {
         $headers = [
             'Content-Type: text/html; charset=UTF-8',
             'From: ' . get_bloginfo('name') . ' <' . get_bloginfo('admin_email') . '>',
-            'Bcc: jerry@tasco.com.au'
+            'Bcc: jerry@tasco.com.au, jhead@zerotech.com.au, internationalorders@zerotech.com.au'
         ];
         
         wp_mail($dealer_email, $subject, $message, $headers);

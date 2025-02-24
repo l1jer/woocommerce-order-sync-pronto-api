@@ -103,7 +103,7 @@
     - Update the order status to `"Pronto Received"`.
   - Ensure this process is error-handled and logged for tracking.
 
-### Step 7: Enhance Redirect Page and Email Notifications
+~~### Step 7: Enhance Redirect Page and Email Notifications~~
 
 #### Redirect Page Update
 

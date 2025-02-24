@@ -110,6 +110,39 @@ This plugin is licensed under the GPLv2 or later. For more information, see http
 
 ### Changelog
 
+#### 2.0-INT
+- **Major Release**: First International Version with Dealer Network Integration
+- **Major Feature**: Added international order handling with dealer network integration
+  - Implemented dealer configuration system with country-based routing
+  - Added dealer notification system with email templates
+  - Introduced new order statuses: "Await Dealer Decision" and "Dealer Accept"
+  - Added 48-hour decision timer for dealer responses
+  - Added 48-hour shipping timer for accepted orders
+  - Implemented timezone-aware communications showing both dealer local time and Sydney time
+- **Enhancement:** Added dealer response handling system
+  - Secure accept/reject links in emails
+  - One-time use token system for dealer actions
+  - Prevention of multiple responses
+  - Automatic Pronto sync on order rejection
+- **Feature:** Enhanced order management interface
+  - Added dealer email and name columns to orders list
+  - Added response time tracking with timezone display
+  - Improved order notes with dealer actions
+- **Security:** Implemented robust security measures
+  - Secure token generation for dealer actions
+  - IP logging for dealer responses
+  - Prevention of unauthorized access
+- **Improvement:** Enhanced email notifications
+  - WooCommerce template integration
+  - Timezone-aware timestamps
+  - Comprehensive order details in notifications
+  - BCC functionality for monitoring
+- **Documentation:** Added detailed workflow documentation
+  - Dealer configuration guide
+  - Order processing workflow
+  - Timezone handling documentation
+  - Security implementation details
+
 #### 1.4.10
 - **Feature**: Added weekend order handling with special Monday morning processing
 - **Feature**: Implemented 30-minute retry interval for weekend orders

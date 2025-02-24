@@ -2,7 +2,7 @@
 /**
  * Plugin Name: WooCommerce Order Sync Pronto API
  * Description: A comprehensive WooCommerce integration with Pronto API that handles order synchronization, shipment tracking, and status management. Features include automatic order syncing upon processing, manual sync capability, Pronto order number retrieval, shipment tracking integration with Advanced Shipment Tracking, custom order statuses, detailed sync logging, and admin interface enhancements. The plugin ensures reliable data synchronization with features like retry mechanisms, weekend processing control, and timeout alerts. Includes a dedicated sync status page, order column enhancements, and robust error handling.
- * Version: 1.4.10
+ * Version: 2.0-INT
  * Author: Jerry Li
  * Text Domain: wcospa
  * Requires at least: 5.0
@@ -26,7 +26,7 @@ add_action('plugins_loaded', function() {
         define('WCOSPA_URL', plugin_dir_url(__FILE__));
     }
     if (!defined('WCOSPA_VERSION')) {
-        define('WCOSPA_VERSION', '1.4.10');
+        define('WCOSPA_VERSION', '2.0-INT');
     }
 }, 5); // Priority 5 to ensure constants are defined early
 
