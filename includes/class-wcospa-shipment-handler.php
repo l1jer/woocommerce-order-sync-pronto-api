@@ -122,9 +122,13 @@ class WCOSPA_Shipment_Handler
     }
 
     /**
-     * Fetch shipment number for an order
+     * Core shipment number validation and processing
+     * 
+     * @param int $order_id The WooCommerce order ID
+     * @param string $context The context of the call (e.g., 'cron', 'ajax', 'auto')
+     * @return array Returns array with validation and processing results
      */
-    public static function fetch_shipment_number($order_id)
+    public static function fetch_shipment_number($order_id, $context = 'auto')
     {
         $order_details = WCOSPA_API_Client::get_pronto_order_details($order_id);
         
@@ -135,51 +139,88 @@ class WCOSPA_Shipment_Handler
                 
                 // Only proceed if status_code is 80 or 90
                 if ($status_code === '80' || $status_code === '90') {
-                    if (isset($order_details['consignment_note'])) {
+                    if (isset($order_details['consignment_note']) && !empty($order_details['consignment_note'])) {
                         $shipment_number = $order_details['consignment_note'];
                         
                         // Add tracking to WooCommerce order
-                        self::add_tracking_to_order($order_id, $shipment_number);
-                        
-                        // Store shipment number in order meta
-                        update_post_meta($order_id, '_wcospa_shipment_number', $shipment_number);
-                        
-                        // Clean up tracking attempt data
-                        delete_post_meta($order_id, '_wcospa_shipment_tracking_start');
-                        delete_post_meta($order_id, '_wcospa_shipment_tracking_attempts');
-                        delete_post_meta($order_id, '_wcospa_last_tracking_attempt');
+                        if (self::add_tracking_to_order($order_id, $shipment_number)) {
+                            // Store shipment number in order meta
+                            update_post_meta($order_id, '_wcospa_shipment_number', $shipment_number);
+                            
+                            // Clean up tracking attempt data if this was from scheduled processing
+                            if ($context === 'cron') {
+                                delete_post_meta($order_id, '_wcospa_shipment_tracking_start');
+                                delete_post_meta($order_id, '_wcospa_shipment_tracking_attempts');
+                                delete_post_meta($order_id, '_wcospa_last_tracking_attempt');
+                            }
 
-                        // Log successful tracking addition
-                        wc_get_logger()->info(
-                            sprintf('Successfully added tracking number %s to order %d with status code %s', 
-                                $shipment_number, 
-                                $order_id,
-                                $status_code
-                            ),
-                            ['source' => 'wcospa']
-                        );
+                            // Log successful tracking addition with context
+                            wc_get_logger()->info(
+                                sprintf('Successfully added tracking number %s to order %d with status code %s via %s', 
+                                    $shipment_number, 
+                                    $order_id,
+                                    $status_code,
+                                    strtoupper($context)
+                                ),
+                                ['source' => 'wcospa']
+                            );
+
+                            return [
+                                'success' => true,
+                                'shipment_number' => $shipment_number,
+                                'status_code' => $status_code,
+                                'context' => $context
+                            ];
+                        }
+                        
+                        return [
+                            'success' => false,
+                            'message' => 'Failed to add tracking information',
+                            'context' => $context
+                        ];
                     }
-                } else {
-                    // Log that we're waiting for correct status code
-                    wc_get_logger()->debug(
-                        sprintf('Order %d has status code %s, waiting for 80 or 90', 
-                            $order_id,
-                            $status_code
-                        ),
-                        ['source' => 'wcospa']
-                    );
                 }
-            } else {
-                // Log missing status code
-                wc_get_logger()->error(
-                    sprintf('Order %d response missing status_code: %s', 
+                
+                // Log that we're waiting for correct status code
+                wc_get_logger()->debug(
+                    sprintf('Order %d has status code %s, waiting for 80 or 90 (via %s)', 
                         $order_id,
-                        print_r($order_details, true)
+                        $status_code,
+                        strtoupper($context)
                     ),
                     ['source' => 'wcospa']
                 );
+                
+                return [
+                    'success' => false,
+                    'message' => sprintf('Order %d has status code %s, waiting for 80 or 90', $order_id, $status_code),
+                    'context' => $context,
+                    'status_code' => $status_code
+                ];
             }
+            
+            // Log missing status code
+            wc_get_logger()->error(
+                sprintf('Order %d response missing status_code: %s (via %s)', 
+                    $order_id,
+                    print_r($order_details, true),
+                    strtoupper($context)
+                ),
+                ['source' => 'wcospa']
+            );
+            
+            return [
+                'success' => false,
+                'message' => sprintf('Order %d response missing status_code', $order_id),
+                'context' => $context
+            ];
         }
+        
+        return [
+            'success' => false,
+            'message' => $order_details->get_error_message(),
+            'context' => $context
+        ];
     }
 
     /**

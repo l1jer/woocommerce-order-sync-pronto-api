@@ -199,18 +199,25 @@ class WCOSPA_Order_Handler
             // Fetch shipping number
             $order_details = WCOSPA_API_Client::get_pronto_order_details($order_id);
             if (!is_wp_error($order_details)) {
-                if (isset($order_details['consignment_note']) && !empty($order_details['consignment_note'])) {
-                    $shipment_number = $order_details['consignment_note'];
-                    
-                    // Add tracking to WooCommerce order using Shipment Handler
-                    WCOSPA_Shipment_Handler::add_tracking_to_order($order_id, $shipment_number);
-                    
-                    // Store shipment number in order meta
-                    update_post_meta($order_id, '_wcospa_shipment_number', $shipment_number);
-                    
-                    error_log("Successfully fetched Shipment Number: {$shipment_number} for order: {$order_id}");
+                // Try to get shipment number using the Shipment Handler
+                $result = WCOSPA_Shipment_Handler::fetch_shipment_number($order_id, 'auto');
+                if ($result['success']) {
+                    wc_get_logger()->info(
+                        sprintf('Successfully fetched Shipment Number: %s for order: %d with status code %s', 
+                            $result['shipment_number'], 
+                            $order_id,
+                            $result['status_code']
+                        ),
+                        ['source' => 'wcospa']
+                    );
                 } else {
-                    error_log("No valid consignment note found for order: {$order_id}");
+                    wc_get_logger()->debug(
+                        sprintf('Could not fetch shipment number for order %d: %s', 
+                            $order_id,
+                            $result['message']
+                        ),
+                        ['source' => 'wcospa']
+                    );
                 }
             }
         } else {
@@ -483,26 +490,23 @@ class WCOSPA_Order_Sync_Button
         set_transient($lock_key, true, 30);
 
         try {
-            $order_details = WCOSPA_API_Client::get_pronto_order_details($order_id);
-
-            if (!is_wp_error($order_details) && isset($order_details['consignment_note']) && !empty($order_details['consignment_note'])) {
-                $shipment_number = $order_details['consignment_note'];
+            // Try to get shipment number using the Shipment Handler
+            $result = WCOSPA_Shipment_Handler::fetch_shipment_number($order_id, 'ajax');
+            
+            if ($result['success']) {
+                wc_get_logger()->info(
+                    sprintf('Successfully added tracking number %s to order %d with status code %s via AJAX', 
+                        $result['shipment_number'], 
+                        $order_id,
+                        $result['status_code']
+                    ),
+                    ['source' => 'wcospa']
+                );
                 
-                // Add tracking to WooCommerce order using Shipment Handler
-                if (WCOSPA_Shipment_Handler::add_tracking_to_order($order_id, $shipment_number)) {
-                    // Store shipment number in order meta
-                    update_post_meta($order_id, '_wcospa_shipment_number', $shipment_number);
-                    
-                    wp_send_json_success(['shipment_number' => $shipment_number]);
-                } else {
-                    wp_send_json_error('Failed to add tracking information');
-                }
+                wp_send_json_success(['shipment_number' => $result['shipment_number']]);
             } else {
-                $error_message = is_wp_error($order_details) ? 
-                    $order_details->get_error_message() : 
-                    'No valid shipment number available yet';
-                error_log("Failed to get valid shipment number for order {$order_id}: " . $error_message);
-                wp_send_json_error($error_message);
+                wc_get_logger()->debug($result['message'], ['source' => 'wcospa']);
+                wp_send_json_error($result['message']);
             }
         } finally {
             // Always remove the lock
