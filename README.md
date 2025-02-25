@@ -110,6 +110,12 @@ This plugin is licensed under the GPLv2 or later. For more information, see http
 
 ### Changelog
 
+#### 1.4.11
+- **Bug Fix**: Fixed issue with shipment numbers being incorrectly stored when status code is not 80 or 90
+- **Improvement**: Enhanced shipment number processing with better validation and error handling
+- **Improvement**: Added context-aware logging for shipment tracking operations
+- **Refactor**: Centralized shipment number processing logic for better maintainability
+
 #### 1.4.10
 - **Feature**: Added weekend order handling with special Monday morning processing
 - **Feature**: Implemented 30-minute retry interval for weekend orders
