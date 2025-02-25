@@ -11,18 +11,19 @@ This plugin automatically syncs WooCommerce orders with the Pronto API upon succ
 ### Order Processing Workflow
 
 1. **Order Sync Initiation**
+
    - Triggered by `handle_order_sync()` method
    - Sync request sent to Pronto API
    - On success, order status updated to 'Pronto Received'
    - Scheduled task created to fetch Pronto order number after 120 seconds
-
 2. **Pronto Order Number Retrieval**
+
    - Scheduled task `scheduled_fetch_pronto_order()` executes
    - Checks for existing Pronto order number in meta data
    - If no number exists, fetches from API
    - Stores number using: `update_post_meta($order_id, '_wcospa_pronto_order_number', $pronto_order_number)`
-
 3. **Order Meta Data Storage**
+
    - Pronto order number stored with key: `_wcospa_pronto_order_number`
    - Visible in WooCommerce order admin interface
    - Displayed in custom column in orders list
@@ -87,18 +88,19 @@ The plugin introduces a custom order status:
 #### Core Functionality Flow
 
 1. Order Synchronisation:
+
    - Triggered when order status changes to "processing"
    - Obtains transaction UUID
    - Initiates 120-second wait period
    - Attempts to fetch Pronto order number
    - Immediately attempts to fetch shipment number upon success
-
 2. Pronto Order Number Retrieval:
+
    - Maximum of 5 retry attempts
    - 30-second interval between retries
    - 3-second delay between different orders
-
 3. Shipment Number Processing:
+
    - Automatic retrieval upon Pronto order number receipt
    - Manual retrieval via "Get Shipping" button
    - Automatic integration with Advanced Shipment Tracking
@@ -111,6 +113,7 @@ This plugin is licensed under the GPLv2 or later. For more information, see http
 ### Changelog
 
 #### 2.0-INT
+
 - **Major Release**: First International Version with Dealer Network Integration
 - **Major Feature**: Added international order handling with dealer network integration
   - Implemented dealer configuration system with country-based routing
@@ -143,7 +146,15 @@ This plugin is licensed under the GPLv2 or later. For more information, see http
   - Timezone handling documentation
   - Security implementation details
 
+#### 1.4.11
+
+- **Bug Fix**: Fixed issue with shipment numbers being incorrectly stored when status code is not 80 or 90
+- **Improvement**: Enhanced shipment number processing with better validation and error handling
+- **Improvement**: Added context-aware logging for shipment tracking operations
+- **Refactor**: Centralized shipment number processing logic for better maintainability
+
 #### 1.4.10
+
 - **Feature**: Added weekend order handling with special Monday morning processing
 - **Feature**: Implemented 30-minute retry interval for weekend orders
 - **Improvement**: Enhanced logging for weekend order processing
