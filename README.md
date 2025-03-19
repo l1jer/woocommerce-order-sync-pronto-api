@@ -118,6 +118,9 @@ This plugin is licensed under the GPLv2 or later. For more information, see http
   - Updated admin column labels for consistency
 - **Improvement:** Enhanced code readability with consistent status naming
 - **Refactor:** Centralised order status management for better maintainability
+- **Compatibility:** Tested and confirmed compatibility with WordPress 6.7.2, WooCommerce 9.6.0, and PHP 8.2+
+  - Updated plugin metadata to reflect supported versions
+  - Ensured all functionality works correctly with latest platform versions
 
 #### 1.4.11
 - **Bug Fix**: Fixed issue with shipment numbers being incorrectly stored when status code is not 80 or 90
