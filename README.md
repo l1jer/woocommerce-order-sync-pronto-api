@@ -13,7 +13,7 @@ This plugin automatically syncs WooCommerce orders with the Pronto API upon succ
 1. **Order Sync Initiation**
    - Triggered by `handle_order_sync()` method
    - Sync request sent to Pronto API
-   - On success, order status updated to 'Pronto Received'
+   - On success, order status updated to 'Preparing to Ship'
    - Scheduled task created to fetch Pronto order number after 120 seconds
 
 2. **Pronto Order Number Retrieval**
@@ -80,7 +80,7 @@ The plugin responds to these WordPress hooks:
 
 The plugin introduces a custom order status:
 
-- Status Name: "Pronto Received" (`wc-pronto-received`)
+- Status Name: "Preparing to Ship" (`wc-preparing-to-ship`)
 - Visual Indicator: Orange background with white text
 - Automatically applied after successful API synchronisation
 
@@ -109,6 +109,15 @@ The plugin introduces a custom order status:
 This plugin is licensed under the GPLv2 or later. For more information, see https://www.gnu.org/licenses/gpl-2.0.html.
 
 ### Changelog
+
+#### 1.4.12
+- **Enhancement:** Changed order status name from "Pronto Received" to "Preparing to Ship" for better clarity
+  - Updated status slug from `wc-pronto-received` to `wc-preparing-to-ship`
+  - Updated all related functions and CSS classes
+  - Maintained existing functionality while improving status naming
+  - Updated admin column labels for consistency
+- **Improvement:** Enhanced code readability with consistent status naming
+- **Refactor:** Centralised order status management for better maintainability
 
 #### 1.4.11
 - **Bug Fix**: Fixed issue with shipment numbers being incorrectly stored when status code is not 80 or 90
@@ -195,7 +204,7 @@ This plugin is licensed under the GPLv2 or later. For more information, see http
 
 = 1.4.1 =
 
-- **Feature:** Added a new custom order status `Pronto Received` (`wc-pronto-received`), which tracks orders that have been successfully synced with the Pronto API.
+- **Feature:** Added a new custom order status `Preparing to Ship` (`wc-preparing-to-ship`), which tracks orders that have been successfully synced with the Pronto API.
 - **Improvement:** Updated delivery instructions for more accurate and clearer formatting.
 - **Improvement:** Amended the delivery address structure
 - **Improvement:** The "Fetch" button in the admin order page has been hidden.

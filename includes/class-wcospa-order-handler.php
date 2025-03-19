@@ -107,7 +107,7 @@ class WCOSPA_Order_Handler
             );
         } else {
             $order = wc_get_order($order_id);
-            $order->update_status('wc-pronto-received', 'Order marked as Pronto Received after successful API sync.');
+            $order->update_status('wc-preparing-to-ship', 'Order marked as Preparing to Ship after successful API sync.');
             
             // Store transaction UUID and sync time
             update_post_meta($order_id, '_wcospa_transaction_uuid', $response);
@@ -513,16 +513,16 @@ class WCOSPA_Admin_Orders_Column
     public static function add_order_columns($columns)
     {
         $new_columns = [];
-
+        
         foreach ($columns as $key => $value) {
             $new_columns[$key] = $value;
             if ($key === 'order_total') {
-                $new_columns['pronto_order_number'] = __('Pronto Order', 'wcospa');
+                $new_columns['pronto_order_number'] = __('Preparing to Ship Order', 'wcospa');
                 $new_columns['shipment_number'] = __('Shipment', 'wcospa');
                 $new_columns['transaction_uuid'] = __('TranUuid', 'wcospa');
             }
         }
-
+        
         return $new_columns;
     }
 
@@ -807,38 +807,38 @@ class WCOSPA_Order_Data_Formatter
     }
 }
 
-function register_pronto_received_order_status()
+function register_preparing_to_ship_order_status()
 {
-    register_post_status('wc-pronto-received', [
-        'label' => 'Pronto Received',
+    register_post_status('wc-preparing-to-ship', [
+        'label' => 'Preparing to Ship',
         'public' => true,
         'exclude_from_search' => false,
         'show_in_admin_all_list' => true,
         'show_in_admin_status_list' => true,
-        'label_count' => _n_noop('Pronto Received <span class="count">(%s)</span>', 'Pronto Received <span class="count">(%s)</span>'),
+        'label_count' => _n_noop('Preparing to Ship <span class="count">(%s)</span>', 'Preparing to Ship <span class="count">(%s)</span>'),
     ]);
 }
-add_action('init', 'register_pronto_received_order_status');
+add_action('init', 'register_preparing_to_ship_order_status');
 
-function add_pronto_received_to_order_statuses($order_statuses)
+function add_preparing_to_ship_to_order_statuses($order_statuses)
 {
     $new_order_statuses = [];
 
     foreach ($order_statuses as $key => $status) {
         $new_order_statuses[$key] = $status;
         if ('wc-processing' === $key) {
-            $new_order_statuses['wc-pronto-received'] = 'Pronto Received';
+            $new_order_statuses['wc-preparing-to-ship'] = 'Preparing to Ship';
         }
     }
 
     return $new_order_statuses;
 }
-add_filter('wc_order_statuses', 'add_pronto_received_to_order_statuses');
+add_filter('wc_order_statuses', 'add_preparing_to_ship_to_order_statuses');
 
 function wc_custom_order_status_styles()
 {
     echo '<style>
-        .status-pronto-received {
+        .status-preparing-to-ship {
             background-color: orange !important;
             color: white !important;
         }
