@@ -365,15 +365,98 @@ class WCOSPA_Order_Sync_Button
     {
         // Add buttons to the single order page under General section
         add_action('admin_footer', [__CLASS__, 'enqueue_sync_button_script']);
+        add_action('woocommerce_admin_order_data_after_order_details', [__CLASS__, 'add_environment_selector']);
         add_action('wp_ajax_wcospa_sync_order', [__CLASS__, 'handle_ajax_sync']);
         add_action('wp_ajax_wcospa_fetch_pronto_order', [__CLASS__, 'handle_ajax_fetch']);
         add_action('wp_ajax_wcospa_get_shipping', [__CLASS__, 'handle_ajax_get_shipping']);
+        add_action('wp_ajax_wcospa_save_environment', [__CLASS__, 'handle_ajax_save_environment']);
+    }
+
+    /**
+     * Add environment selector to order page
+     * 
+     * @param WC_Order $order The order object
+     */
+    public static function add_environment_selector($order) {
+        $order_id = $order->get_id();
+        $current_env = WCOSPA_Utils::get_order_meta($order_id, '_wcospa_test_environment', true);
+        if (empty($current_env)) {
+            $current_env = 'production'; // Default to production
+        }
+        
+        // Create nonce for security
+        $nonce = wp_create_nonce('wcospa_environment_nonce');
+        
+        ?>
+        <div class="wcospa-environment-selector" style="margin-top: 20px; padding: 10px; background-color: #f8f8f8; border: 1px solid #ddd; border-radius: 4px;">
+            <h4><?php _e('Pronto API Environment', 'wcospa'); ?></h4>
+            <p><?php _e('Select which Pronto API environment to use for this order:', 'wcospa'); ?></p>
+            
+            <div style="margin-bottom: 10px;">
+                <label style="margin-right: 15px;">
+                    <input type="radio" name="wcospa_environment" value="production" <?php checked($current_env, 'production'); ?>>
+                    <?php _e('Production Environment', 'wcospa'); ?>
+                </label>
+                
+                <label>
+                    <input type="radio" name="wcospa_environment" value="test" <?php checked($current_env, 'test'); ?>>
+                    <?php _e('Test Environment', 'wcospa'); ?>
+                </label>
+            </div>
+            
+            <button type="button" class="button button-secondary" id="wcospa-save-environment" 
+                data-order-id="<?php echo esc_attr($order_id); ?>" 
+                data-nonce="<?php echo esc_attr($nonce); ?>">
+                <?php _e('Save Environment Setting', 'wcospa'); ?>
+            </button>
+            
+            <div id="wcospa-environment-message" style="margin-top: 10px; display: none;"></div>
+        </div>
+        <?php
     }
 
     public static function enqueue_sync_button_script()
     {
         wp_enqueue_script('wcospa-admin', WCOSPA_URL . 'assets/js/wcospa-admin.js', ['jquery'], WCOSPA_VERSION, true);
         wp_enqueue_style('wcospa-admin-style', WCOSPA_URL . 'assets/css/wcospa-admin.css', [], WCOSPA_VERSION);
+        
+        // Add localization for the environment selector
+        wp_localize_script('wcospa-admin', 'wcospaEnv', [
+            'ajaxurl' => admin_url('admin-ajax.php'),
+            'saveSuccess' => __('Environment setting saved successfully.', 'wcospa'),
+            'saveError' => __('Error saving environment setting.', 'wcospa')
+        ]);
+    }
+    
+    /**
+     * Handle AJAX request to save environment setting
+     */
+    public static function handle_ajax_save_environment() {
+        check_ajax_referer('wcospa_environment_nonce', 'security');
+        
+        if (!isset($_POST['order_id']) || !isset($_POST['environment'])) {
+            wp_send_json_error('Missing required parameters');
+        }
+        
+        $order_id = intval($_POST['order_id']);
+        $environment = sanitize_text_field($_POST['environment']);
+        
+        // Validate environment value
+        if (!in_array($environment, ['production', 'test'])) {
+            wp_send_json_error('Invalid environment value');
+        }
+        
+        // Save environment setting
+        $updated = WCOSPA_Utils::update_order_meta($order_id, '_wcospa_test_environment', $environment);
+        
+        if ($updated) {
+            wp_send_json_success([
+                'message' => __('Environment setting saved successfully.', 'wcospa'),
+                'environment' => $environment
+            ]);
+        } else {
+            wp_send_json_error('Failed to save environment setting');
+        }
     }
 
     public static function handle_ajax_sync()
@@ -657,7 +740,7 @@ class WCOSPA_Order_Data_Formatter
         // Return the formatted order data
         return [
             'customer_reference' => $customer_reference,
-            'debtor' => '210942',
+            'debtor' => WCOSPA_Credentials::get_debtor_code(),
             'delivery_address' => $delivery_address,
             'delivery_instructions' => $delivery_instructions,
             'payment' => [

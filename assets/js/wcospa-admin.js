@@ -1,4 +1,70 @@
 document.addEventListener("DOMContentLoaded", function () {
+    // Environment selector functionality
+    const saveEnvironmentButton = document.getElementById('wcospa-save-environment');
+    if (saveEnvironmentButton) {
+        saveEnvironmentButton.addEventListener('click', function() {
+            const orderId = saveEnvironmentButton.getAttribute('data-order-id');
+            const nonce = saveEnvironmentButton.getAttribute('data-nonce');
+            const selectedEnvironment = document.querySelector('input[name="wcospa_environment"]:checked').value;
+            const messageDiv = document.getElementById('wcospa-environment-message');
+            
+            // Show loading state
+            saveEnvironmentButton.disabled = true;
+            saveEnvironmentButton.textContent = 'Saving...';
+            
+            const formData = new FormData();
+            formData.append('action', 'wcospa_save_environment');
+            formData.append('order_id', orderId);
+            formData.append('environment', selectedEnvironment);
+            formData.append('security', nonce);
+            
+            fetch(ajaxurl, {
+                method: 'POST',
+                body: formData,
+                credentials: 'same-origin'
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Success message
+                    messageDiv.textContent = data.data.message;
+                    messageDiv.style.display = 'block';
+                    messageDiv.style.color = 'green';
+                    messageDiv.style.backgroundColor = '#f0fff0';
+                    messageDiv.style.padding = '5px';
+                    messageDiv.style.border = '1px solid green';
+                } else {
+                    // Error message
+                    messageDiv.textContent = data.data || 'Failed to save environment setting';
+                    messageDiv.style.display = 'block';
+                    messageDiv.style.color = 'red';
+                    messageDiv.style.backgroundColor = '#fff0f0';
+                    messageDiv.style.padding = '5px';
+                    messageDiv.style.border = '1px solid red';
+                }
+                
+                // Reset button state
+                saveEnvironmentButton.disabled = false;
+                saveEnvironmentButton.textContent = 'Save Environment Setting';
+                
+                // Hide message after 3 seconds
+                setTimeout(function() {
+                    messageDiv.style.display = 'none';
+                }, 3000);
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                messageDiv.textContent = 'Error saving environment setting';
+                messageDiv.style.display = 'block';
+                messageDiv.style.color = 'red';
+                
+                // Reset button state
+                saveEnvironmentButton.disabled = false;
+                saveEnvironmentButton.textContent = 'Save Environment Setting';
+            });
+        });
+    }
+
     // Clear Sync Logs button
     // var clearLogsButton = document.getElementById("wcospa-clear-logs");
     // if (clearLogsButton) {

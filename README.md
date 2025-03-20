@@ -8,6 +8,73 @@ This plugin automatically syncs WooCommerce orders with the Pronto API upon succ
 2. Activate the plugin through the 'Plugins' menu in WordPress.
 3. Configure your API credentials in the `wcospa-credentials.php` file located in `includes/`.
 
+### Configuration
+
+#### API Credentials
+
+Create a `wcospa-credentials.php` file in the `includes/` directory by copying the sample file and updating the values:
+
+```php
+<?php
+class WCOSPA_Credentials {
+    public static function get_api_credentials() {
+        return [
+            'api_url' => 'https://your-api-url.com/api/json/order/v6.json/',
+            'username' => 'your-username',
+            'password' => 'your-password'
+        ];
+    }
+}
+```
+
+#### Debtor Code Configuration
+
+The plugin automatically selects the appropriate debtor code based on the website domain:
+
+- example1.com.au: SITE1_DEBTOR_CODE
+- example2.com.au: SITE2_DEBTOR_CODE
+- shop.example3.com: SITE3_DEBTOR_CODE
+
+For development/testing environments, you can:
+
+1. Define a custom debtor code for testing in wp-config.php:
+   ```php
+   define('WCOSPA_DEV_DEBTOR_CODE', 'YOUR_TEST_CODE'); // Replace with your test debtor code
+   ```
+
+2. If no custom code is defined, the plugin will use the default test code 'DEFAULT_DEV_CODE' for any development environment.
+
+3. Development environments are automatically detected for domains containing:
+   - localhost
+   - 127.0.0.1
+   - .test, .local, .dev
+   - dev.
+   - Any staging domain pattern (staging, staging2, staging10, etc.)
+
+### API Environment Selection
+
+The plugin provides the ability to choose which API environment (Test or Production) to use on a per-order basis:
+
+1. **Per-Order Environment Selection**:
+   - When viewing an order in the WooCommerce admin, you'll see a "Pronto API Environment" section
+   - Select either "Production Environment" or "Test Environment" 
+   - Click "Save Environment Setting" to apply the change
+   - A confirmation message will appear when the setting is saved
+
+2. **Environment Persistence**:
+   - The selected environment is stored with the order and persists between page loads
+   - Each order can have its own environment setting independent of other orders
+   - This allows testing with specific orders without affecting the entire system
+
+3. **Visual Indicators**:
+   - The system logs which environment is being used for each API operation
+   - Check the WooCommerce logs for detailed information about which environment was used
+
+4. **Global Default**:
+   - If no per-order setting is specified, the system will use the global setting
+   - Define `WCOSPA_TEST_MODE` as true in wp-config.php to use test mode globally
+   - Example: `define('WCOSPA_TEST_MODE', true);`
+
 ### Order Processing Workflow
 
 1. **Order Sync Initiation**
@@ -110,10 +177,43 @@ This plugin is licensed under the GPLv2 or later. For more information, see http
 
 ### Changelog
 
+#### 1.5
+- **Major Release:** Consolidated and stabilized features from the 1.4.x development cycle
+- **Enhancement:** Refined per-order environment selection functionality
+  - Improved UI/UX for toggling between production and test environments
+  - Enhanced error handling and feedback messages
+  - Added comprehensive logging of environment selection changes
+- **Optimization:** Improved dynamic debtor code detection and management
+  - Strengthened domain detection logic for multi-site setups
+  - Enhanced staging environment pattern recognition
+  - Better fallback handling for edge cases
+- **Reliability:** Enhanced error handling throughout API communication
+  - Better response parsing for invalid or unexpected API responses
+  - Improved logging with environment context
+  - More descriptive error messages for troubleshooting
+- **Documentation:** Updated documentation with thorough explanations
+  - Added detailed section on API environment selection
+  - Included setup instructions for multiple domain configurations
+  - Updated configuration examples with latest best practices
+
 #### 1.4.13
 - **Improvement:** Updated plugin version for maintenance release
 - **Maintenance:** General code updates and compatibility checks
+- **Enhancement:** Implemented dynamic debtor code selection based on website domain
+  - Added support for multiple websites using domain-specific debtor codes
+  - Created configuration in credentials file for easy management
+  - Supports multiple domains with automatic detection
+  - Added development environment detection for local testing
+  - Implemented configurable test debtor code via `WCOSPA_DEV_DEBTOR_CODE` constant
+  - Provided fallback test debtor code for development environments
+- **Feature:** Added environment selection for each order
+  - Added radio buttons to toggle between test and production environments
+  - Implemented per-order environment setting for API requests
+  - Added visual confirmation and feedback for environment changes
+  - Environment selection persists between page loads
 - **Documentation:** Updated documentation for clarity and completeness
+  - Added detailed configuration instructions
+  - Included development environment setup guidance
 
 #### 1.4.12
 - **Enhancement:** Changed order status name from "Pronto Received" to "Preparing to Ship" for better clarity
@@ -256,70 +356,4 @@ This plugin is licensed under the GPLv2 or later. For more information, see http
 - **Change:** Updated price calculation for API: product prices are now divided by `1.1` before being sent, rounded to 2 decimal places.
 - **Change:** Updated delivery address formatting:
   - `address1` now includes the customer's first and last name, capitalized.
-  - `address2` corresponds to the original `address_1`.
-  - `address3` corresponds to the original `address_2`.
-
-= 1.3.2.1 =
-
-- **Feature:** Updated delivery instructions handling:
-  - `del_inst_1` now includes "NO INVOICE & PACKING SLIP" in uppercase.
-  - `del_inst_2` adds the customer email from shipping if different from the billing email.
-  - `del_inst_3` includes the first 30 characters of the Order Notes, if available.
-- **Feature:** Pronto Order No. field now displays `"-"` until the Sync button is clicked, and `"Pending"` after the button is clicked until the Pronto order number is fetched.
-- **Enhancement:** Sync button now displays `"Syncing..."` while the sync is in progress and updates the Pronto Order No. field accordingly.
-- **Improvement:** General code refactoring and enhancements for better performance and usability.
-- **Improvement:** The Sync button's JavaScript has been rewritten using plain JavaScript (Vanilla JS) instead of jQuery.
-
-= 1.3.2 =
-
-- **Feature:** Added a new "Clear All Sync Data" button to the Sync Status page.
-  - Clicking this button will reset the sync status for all orders, allowing them to be re-synced.
-  - All related metadata such as the transaction UUID, Pronto Order number, and sync status will be cleared.
-- **Improvement:** General code refactoring and enhancements for better performance and usability.
-
-= 1.3.1 =
-
-- **Enhancement:** Updated the "Pronto Order No." column to display `"-"` when no data is available and `"Pending"` only if the sync is in progress.
-- **Enhancement:** The sync button now immediately changes to `"Already Synced"` once the sync process starts, instead of showing `"Pending"`.
-- **Enhancement:** Updated the `customer_reference` in the API request to be formatted as `"order number / shipping last name"`.
-- **Improvement:** General code refactoring for better performance and readability.
-
-= 1.3.0 =
-
-- **Feature:** Added a cron job to automatically check the status of synced orders every minute for up to 10 minutes.
-- **Feature:** New column "Pronto Order No." added to the WooCommerce Orders admin page, displaying the Pronto Order number once retrieved.
-- **Enhancement:** The sync button now shows "Pending" after syncing and stores the transaction UUID with the order.
-- **Enhancement:** The "Pronto Order No." column will show "Not Synced Yet" if an order has not been synced, or "Pending" if the sync is in progress.
-- **Enhancement:** Improved handling of pending orders by automatically retrieving and updating the Pronto Order number once the transaction is complete.
-- **Enhancement:** Added robust error handling and logging throughout the sync process.
-
-= 1.2.1 =
-
-- **Bug Fix:** Resolved a `403 Forbidden` error when clicking the "Sync" button due to incorrect nonce verification.
-- **Enhancement:** Improved nonce handling for AJAX requests to prevent unauthorized access errors.
-- **Enhancement:** Added visual feedback for successful sync operations in the WooCommerce admin order actions.
-
-= 1.2.0 =
-
-- **Feature:** Added a "Sync Status" page under the WooCommerce menu.
-  - Displays all sync logs, including order details, sync date/time, and Pronto Order number.
-  - Includes a "Clear Sync Records" button to delete all sync logs with a confirmation prompt.
-- **Enhancement:** Automatically retrieves and logs the Pronto Order number after a successful sync using the API.
-- **Enhancement:** Improved the logging system to store sync events, including transaction UUID and Pronto Order number.
-
-= 1.1.0 =
-
-- **Feature:** Updated the sync button in WooCommerce admin:
-  - The button is disabled and greyed out for orders that are not in "processing" or "completed" status.
-  - Added a tooltip "Unable to sync Cancelled and On-hold orders" when hovering over the disabled button.
-  - The sync button is disabled after an order is successfully synced, displaying "Already Synced".
-- **Enhancement:** Improved the API request process:
-  - After syncing an order, the API returns a transaction UUID.
-  - The plugin fetches the Pronto Order number using the UUID and logs it for future reference.
-
-= 1.0.0 =
-
-- **Initial Release:**
-  - Automatically syncs WooCommerce orders with the Pronto API upon successful processing.
-  - Added a manual sync button to the WooCommerce admin order actions.
-  - Logging for successful API requests, including order details and sync timestamps.
+  - `

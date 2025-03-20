@@ -1,5 +1,4 @@
 <?php
-// This is a sample credentials file. Copy this to wcospa-credentials.php and update with your actual credentials.
 
 if (!defined('ABSPATH')) {
     exit;
@@ -8,7 +7,7 @@ if (!defined('ABSPATH')) {
 class WCOSPA_Credentials {
     
     // Define constants for easier maintenance
-    const DEFAULT_DEBTOR_CODE = 'DEFAULT_CODE_HERE';
+    const DEFAULT_DEBTOR_CODE = '210942';
     
     /**
      * Get the API credentials for connecting to Pronto
@@ -37,20 +36,20 @@ class WCOSPA_Credentials {
         if ($use_test_env) {
             // Test environment
             return [
-                'post_order' => 'https://test-api-url.com/api/json/order/v6.json/',
-                'get_transaction' => 'https://test-api-url.com/api/json/transaction/v5.json/',
-                'get_order' => 'https://test-api-url.com/api/json/order/v4.json/',
-                'username' => 'test-username',
-                'password' => 'test-password',
+                'post_order' => 'https://tasco-750-test.prontoavenue.biz/api/json/order/v6.json/',
+                'get_transaction' => 'https://tasco-750-test.prontoavenue.biz/api/json/transaction/v5.json/',
+                'get_order' => 'https://tasco-750-test.prontoavenue.biz/api/json/order/v4.json/',
+                'username' => 'jerry@tasco.com.au',
+                'password' => 'x$ArLvH*JgFsrHoQyDwwzQ)n',
             ];
         } else {
             // Production environment
             return [
-                'post_order' => 'https://prod-api-url.com/api/json/order/v6.json/',
-                'get_transaction' => 'https://prod-api-url.com/api/json/transaction/v5.json/',
-                'get_order' => 'https://prod-api-url.com/api/json/order/v4.json/',
-                'username' => 'prod-username',
-                'password' => 'prod-password',
+                'post_order' => 'https://sales.tasco.net.au/api/json/order/v6.json/',
+                'get_transaction' => 'https://sales.tasco.net.au/api/json/transaction/v5.json/',
+                'get_order' => 'https://sales.tasco.net.au/api/json/order/v4.json/',
+                'username' => 'jerry@tasco.com.au',
+                'password' => 'x$ArLvH*JgFsrHoQyDwwzQ)n',
             ];
         }
     }
@@ -65,10 +64,11 @@ class WCOSPA_Credentials {
         
         // Website-specific debtor codes
         $debtor_codes = [
-            // Production sites - Replace with your actual domains and debtor codes
-            'example1.com.au' => 'SITE1_DEBTOR_CODE',
-            'example2.com.au' => self::DEFAULT_DEBTOR_CODE,
-            'example3.com.au' => 'SITE3_DEBTOR_CODE', 
+            // Production sites
+            'nitecoreaustralia.com.au' => '211023',
+            'zerotech.com.au' => self::DEFAULT_DEBTOR_CODE,
+            'shop.zerotechoptics.com' => self::DEFAULT_DEBTOR_CODE,
+            'skywatcheraustralia.com.au' => '210943', // Replace SKYWATCH_PLACEHOLDER with actual code
             
             // Development/staging environments - specific matches only
             'localhost' => self::DEFAULT_DEBTOR_CODE,
@@ -81,9 +81,10 @@ class WCOSPA_Credentials {
         
         // Option 2: Check for staging environments with patterns like stagingX.domain.com
         $staging_patterns = [
-            '/^staging\d*\.example1\.com\.au$/' => 'SITE1_DEBTOR_CODE',
-            '/^staging\d*\.example2\.com\.au$/' => self::DEFAULT_DEBTOR_CODE,
-            '/^staging\d*\.example3\.com\.au$/' => 'SITE3_DEBTOR_CODE',
+            '/^staging\d*\.nitecoreaustralia\.com\.au$/' => '211023',
+            '/^staging\d*\.zerotech\.com\.au$/' => self::DEFAULT_DEBTOR_CODE,
+            '/^staging\d*\.zerotechoptics\.com$/' => self::DEFAULT_DEBTOR_CODE,
+            '/^staging\d*\.skywatcheraustralia\.com\.au$/' => '210943', // Same as production
         ];
         
         foreach ($staging_patterns as $pattern => $debtor_code) {

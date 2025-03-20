@@ -29,12 +29,16 @@ class WCOSPA_API_Client
         }
 
         try {
-            // Get API credentials
-            $credentials = WCOSPA_Credentials::get_api_credentials();
+            // Get API credentials with order ID for environment selection
+            $credentials = WCOSPA_Credentials::get_api_credentials($order_id);
             if (!isset($credentials['post_order'])) {
                 throw new Exception('API URL not found in credentials');
             }
             $api_url = $credentials['post_order'];
+
+            // Log which environment is being used
+            $env_type = strpos($api_url, 'tasco-750-test') !== false ? 'TEST' : 'PRODUCTION';
+            self::log(sprintf('Using %s environment for order #%d', $env_type, $order_id));
 
             // Prepare the second argument for the format_order method
             $customer_reference = sprintf('%d / %s', $order->get_id(), strtoupper($order->get_shipping_last_name()));
@@ -147,13 +151,18 @@ class WCOSPA_API_Client
                 return new WP_Error('uuid_not_found', 'Transaction UUID not found in order.');
             }
 
-            // Get API credentials
-            $credentials = WCOSPA_Credentials::get_api_credentials();
+            // Get API credentials with order ID for environment selection
+            $credentials = WCOSPA_Credentials::get_api_credentials($order_id);
             if (!isset($credentials['get_transaction'])) {
-                throw new Exception('Transaction URL not found in credentials');
+                throw new Exception('Transaction API URL not found in credentials');
             }
+            
+            // Log which environment is being used
+            $api_url = $credentials['get_transaction'];
+            $env_type = strpos($api_url, 'tasco-750-test') !== false ? 'TEST' : 'PRODUCTION';
+            self::log(sprintf('Using %s environment for fetching order #%d status', $env_type, $order_id));
 
-            $transaction_url = $credentials['get_transaction'] . '?uuid=' . urlencode($transaction_uuid);
+            $transaction_url = $api_url . '?uuid=' . urlencode($transaction_uuid);
 
             // Log the transaction URL for debugging
             self::log(sprintf('Transaction URL: %s', $transaction_url));
@@ -213,54 +222,72 @@ class WCOSPA_API_Client
     // Step 3: Get Pronto Order details using the Pronto Order Number
     public static function get_pronto_order_details($order_id)
     {
+        if (!is_int($order_id)) {
+            $order_id = (int) $order_id;
+        }
+
         $order = wc_get_order($order_id);
-        if (!$order) {
-            return new WP_Error('order_not_found', 'Order not found: ' . $order_id);
+        if (!($order instanceof WC_Order)) {
+            return new WP_Error('order_not_found', sprintf('Order not found: %d', $order_id));
         }
 
-        // Retrieve the Pronto Order Number
         $pronto_order_number = get_post_meta($order_id, '_wcospa_pronto_order_number', true);
-        if (!$pronto_order_number) {
-            return new WP_Error('pronto_order_number_not_found', 'Pronto Order number not found in order.');
+        if (empty($pronto_order_number)) {
+            return new WP_Error('pronto_order_number_not_found', 'Pronto Order Number not found in order.');
         }
 
-        // Get API credentials
-        $credentials = WCOSPA_Credentials::get_api_credentials();
-        $order_url = $credentials['get_order'] . '?number=' . $pronto_order_number;
+        try {
+            // Get API credentials with order ID for environment selection
+            $credentials = WCOSPA_Credentials::get_api_credentials($order_id);
+            if (!isset($credentials['get_order'])) {
+                throw new Exception('Order API URL not found in credentials');
+            }
+            
+            // Log which environment is being used
+            $api_url = $credentials['get_order'];
+            $env_type = strpos($api_url, 'tasco-750-test') !== false ? 'TEST' : 'PRODUCTION';
+            self::log(sprintf('Using %s environment for getting order #%d details', $env_type, $order_id));
 
-        // Log the order URL for debugging
-        self::log('Order URL: ' . $order_url);
+            $order_url = $api_url . '?number=' . $pronto_order_number;
 
-        // Make the GET request to the API
-        $response = wp_remote_get($order_url, [
-            'headers' => [
-                'Authorization' => 'Basic ' . base64_encode($credentials['username'] . ':' . $credentials['password']),
-            ],
-            'timeout' => 20,
-        ]);
+            // Log the order URL for debugging
+            self::log('Order URL: ' . $order_url);
 
-        if (is_wp_error($response)) {
-            self::log('Pronto Order API request failed: ' . $response->get_error_message());
-            return $response;
+            // Make the GET request to the API
+            $response = wp_remote_get($order_url, [
+                'headers' => [
+                    'Authorization' => 'Basic ' . base64_encode($credentials['username'] . ':' . $credentials['password']),
+                ],
+                'timeout' => 20,
+            ]);
+
+            if (is_wp_error($response)) {
+                self::log('Pronto Order API request failed: ' . $response->get_error_message());
+                return $response;
+            }
+
+            $body = json_decode(wp_remote_retrieve_body($response), true);
+            self::log('Pronto Order response body: ' . print_r($body, true));
+
+            if (empty($body) || !isset($body['orders']) || !is_array($body['orders']) || empty($body['orders'])) {
+                return new WP_Error('empty_response', 'The API returned an invalid response.');
+            }
+
+            // Get the first order from the orders array
+            $order_details = $body['orders'][0];
+
+            // Check if consignment_note exists
+            if (!isset($order_details['consignment_note'])) {
+                return new WP_Error('no_consignment_note', 'No consignment note found in order details.');
+            }
+
+            // Return just the order details instead of the whole response
+            return $order_details;
+
+        } catch (Exception $e) {
+            self::log('Exception occurred: ' . $e->getMessage());
+            return new WP_Error('get_details_exception', $e->getMessage());
         }
-
-        $body = json_decode(wp_remote_retrieve_body($response), true);
-        self::log('Pronto Order response body: ' . print_r($body, true));
-
-        if (empty($body) || !isset($body['orders']) || !is_array($body['orders']) || empty($body['orders'])) {
-            return new WP_Error('empty_response', 'The API returned an invalid response.');
-        }
-
-        // Get the first order from the orders array
-        $order_details = $body['orders'][0];
-
-        // Check if consignment_note exists
-        if (!isset($order_details['consignment_note'])) {
-            return new WP_Error('no_consignment_note', 'No consignment note found in order details.');
-        }
-
-        // Return just the order details instead of the whole response
-        return $order_details;
     }
 
     public static function log($message)
