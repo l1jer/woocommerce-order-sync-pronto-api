@@ -110,13 +110,13 @@ class WCOSPA_Order_Handler
             $order->update_status('wc-preparing-to-ship', 'Order marked as Preparing to Ship after successful API sync.');
             
             // Store transaction UUID and sync time
-            update_post_meta($order_id, '_wcospa_transaction_uuid', $response);
-            update_post_meta($order_id, '_wcospa_sync_time', time());
-            update_post_meta($order_id, '_wcospa_fetch_retry_count', 0);
+            WCOSPA_Utils::update_order_meta($order_id, '_wcospa_transaction_uuid', $response);
+            WCOSPA_Utils::update_order_meta($order_id, '_wcospa_sync_time', time());
+            WCOSPA_Utils::update_order_meta($order_id, '_wcospa_fetch_retry_count', 0);
             
             // Mark as weekend order if applicable
             if (WCOSPA_Utils::is_weekend()) {
-                update_post_meta($order_id, '_wcospa_weekend_order', '1');
+                WCOSPA_Utils::update_order_meta($order_id, '_wcospa_weekend_order', '1');
                 wc_get_logger()->info(
                     sprintf('Order %d marked as weekend order', $order_id),
                     ['source' => 'wcospa']
@@ -137,7 +137,7 @@ class WCOSPA_Order_Handler
     public static function scheduled_fetch_pronto_order($order_id, $attempt = 1)
     {
         // Check if Pronto Order Number already exists
-        $existing_number = get_post_meta($order_id, '_wcospa_pronto_order_number', true);
+        $existing_number = WCOSPA_Utils::get_order_meta($order_id, '_wcospa_pronto_order_number', true);
         if (!empty($existing_number)) {
             wc_get_logger()->debug(
                 sprintf('Order %d already has Pronto Order Number: %s', $order_id, $existing_number),
@@ -147,7 +147,7 @@ class WCOSPA_Order_Handler
         }
 
         // Get retry count
-        $retry_count = (int) get_post_meta($order_id, '_wcospa_fetch_retry_count', true);
+        $retry_count = (int) WCOSPA_Utils::get_order_meta($order_id, '_wcospa_fetch_retry_count', true);
         
         // Check if we've exceeded max retries
         if ($retry_count >= self::MAX_RETRY_COUNT) {
@@ -162,12 +162,12 @@ class WCOSPA_Order_Handler
         $pronto_order_number = WCOSPA_API_Client::fetch_order_status($order_id);
 
         // Increment retry count
-        update_post_meta($order_id, '_wcospa_fetch_retry_count', $retry_count + 1);
+        WCOSPA_Utils::update_order_meta($order_id, '_wcospa_fetch_retry_count', $retry_count + 1);
 
         if (!is_wp_error($pronto_order_number) && !empty($pronto_order_number)) {
             // Success! Store the order number
-            update_post_meta($order_id, '_wcospa_pronto_order_number', $pronto_order_number);
-            delete_post_meta($order_id, '_wcospa_fetch_retry_count'); // Clean up retry count
+            WCOSPA_Utils::update_order_meta($order_id, '_wcospa_pronto_order_number', $pronto_order_number);
+            WCOSPA_Utils::delete_order_meta($order_id, '_wcospa_fetch_retry_count'); // Clean up retry count
             
             wc_get_logger()->info(
                 sprintf('Successfully fetched Pronto Order Number: %s for order: %d', 
@@ -207,7 +207,7 @@ class WCOSPA_Order_Handler
         } else {
             // Failed attempt - increment retry count and schedule next attempt if needed
             $retry_count++;
-            update_post_meta($order_id, '_wcospa_fetch_retry_count', $retry_count);
+            WCOSPA_Utils::update_order_meta($order_id, '_wcospa_fetch_retry_count', $retry_count);
             
             if ($retry_count < self::MAX_RETRY_COUNT) {
                 // Calculate delay for next attempt (includes 3-second spacing between orders)
@@ -253,7 +253,7 @@ class WCOSPA_Order_Handler
                 );
 
                 foreach ($weekend_orders as $order) {
-                    update_post_meta($order->order_id, '_wcospa_fetch_retry_count', 0);
+                    WCOSPA_Utils::update_order_meta($order->order_id, '_wcospa_fetch_retry_count', 0);
                     wp_schedule_single_event(
                         time() + (self::REQUEST_DELAY * array_search($order, $weekend_orders)),
                         'wcospa_fetch_pronto_order_number',
@@ -318,20 +318,20 @@ class WCOSPA_Order_Handler
     public static function fetch_pronto_order($order_id)
     {
         // Get retry count
-        $retry_count = (int) get_post_meta($order_id, '_wcospa_fetch_retry_count', true);
-        $is_weekend_order = get_post_meta($order_id, '_wcospa_weekend_order', true);
+        $retry_count = (int) WCOSPA_Utils::get_order_meta($order_id, '_wcospa_fetch_retry_count', true);
+        $is_weekend_order = WCOSPA_Utils::get_order_meta($order_id, '_wcospa_weekend_order', true);
         
         // Execute Fetch operation
         $pronto_order_number = WCOSPA_API_Client::fetch_order_status($order_id);
 
         if (!is_wp_error($pronto_order_number) && !empty($pronto_order_number)) {
             // Success! Store the order number
-            update_post_meta($order_id, '_wcospa_pronto_order_number', $pronto_order_number);
-            delete_post_meta($order_id, '_wcospa_fetch_retry_count');
+            WCOSPA_Utils::update_order_meta($order_id, '_wcospa_pronto_order_number', $pronto_order_number);
+            WCOSPA_Utils::delete_order_meta($order_id, '_wcospa_fetch_retry_count');
             
             // Remove weekend flag if exists
             if ($is_weekend_order) {
-                delete_post_meta($order_id, '_wcospa_weekend_order');
+                WCOSPA_Utils::delete_order_meta($order_id, '_wcospa_weekend_order');
             }
             
             wc_get_logger()->info(
@@ -344,7 +344,7 @@ class WCOSPA_Order_Handler
         } else {
             // Failed attempt - increment retry count
             $retry_count++;
-            update_post_meta($order_id, '_wcospa_fetch_retry_count', $retry_count);
+            WCOSPA_Utils::update_order_meta($order_id, '_wcospa_fetch_retry_count', $retry_count);
             
             // Schedule next attempt
             if ($is_weekend_order) {
@@ -386,7 +386,7 @@ class WCOSPA_Order_Sync_Button
 
         $order_id = intval($_POST['order_id']);
 
-        $transaction_uuid = get_post_meta($order_id, '_wcospa_transaction_uuid', true);
+        $transaction_uuid = WCOSPA_Utils::get_order_meta($order_id, '_wcospa_transaction_uuid', true);
         if (!empty($transaction_uuid)) {
             wp_send_json_error('This order has already been synchronised with Pronto.');
         }
@@ -397,7 +397,7 @@ class WCOSPA_Order_Sync_Button
             wp_send_json_error($uuid->get_error_message());
         }
 
-        update_post_meta($order_id, '_wcospa_transaction_uuid', $uuid);
+        WCOSPA_Utils::update_order_meta($order_id, '_wcospa_transaction_uuid', $uuid);
         wp_send_json_success(['uuid' => $uuid, 'sync_time' => time()]);
     }
 
@@ -412,7 +412,7 @@ class WCOSPA_Order_Sync_Button
         $order_id = intval($_POST['order_id']);
 
         // Check if we already have a Pronto order number
-        $existing_number = get_post_meta($order_id, '_wcospa_pronto_order_number', true);
+        $existing_number = WCOSPA_Utils::get_order_meta($order_id, '_wcospa_pronto_order_number', true);
         if (!empty($existing_number)) {
             wp_send_json_success(['pronto_order_number' => $existing_number]);
             return;
@@ -433,7 +433,7 @@ class WCOSPA_Order_Sync_Button
             $pronto_order_number = WCOSPA_API_Client::fetch_order_status($order_id);
 
             if (!is_wp_error($pronto_order_number) && !empty($pronto_order_number)) {
-                update_post_meta($order_id, '_wcospa_pronto_order_number', $pronto_order_number);
+                WCOSPA_Utils::update_order_meta($order_id, '_wcospa_pronto_order_number', $pronto_order_number);
                 wp_send_json_success(['pronto_order_number' => $pronto_order_number]);
             } else {
                 $error_message = is_wp_error($pronto_order_number) ? $pronto_order_number->get_error_message() : 'Failed to fetch order number';
@@ -456,7 +456,7 @@ class WCOSPA_Order_Sync_Button
         $order_id = intval($_POST['order_id']);
 
         // Check if we already have a shipment number
-        $existing_number = get_post_meta($order_id, '_wcospa_shipment_number', true);
+        $existing_number = WCOSPA_Utils::get_order_meta($order_id, '_wcospa_shipment_number', true);
         if (!empty($existing_number)) {
             wp_send_json_success(['shipment_number' => $existing_number]);
             return;
@@ -530,8 +530,8 @@ class WCOSPA_Admin_Orders_Column
     {
         if ($column === 'pronto_order_number') {
             $order = wc_get_order($post_id);
-            $pronto_order_number = get_post_meta($post_id, '_wcospa_pronto_order_number', true);
-            $transaction_uuid = get_post_meta($post_id, '_wcospa_transaction_uuid', true);
+            $pronto_order_number = WCOSPA_Utils::get_order_meta($post_id, '_wcospa_pronto_order_number', true);
+            $transaction_uuid = WCOSPA_Utils::get_order_meta($post_id, '_wcospa_transaction_uuid', true);
 
             echo '<div class="wcospa-order-column">';
             if ($pronto_order_number) {
@@ -556,8 +556,8 @@ class WCOSPA_Admin_Orders_Column
             echo '</div>';
         } elseif ($column === 'shipment_number') {
             $order = wc_get_order($post_id);
-            $shipment_number = get_post_meta($post_id, '_wcospa_shipment_number', true);
-            $pronto_order_number = get_post_meta($post_id, '_wcospa_pronto_order_number', true);
+            $shipment_number = WCOSPA_Utils::get_order_meta($post_id, '_wcospa_shipment_number', true);
+            $pronto_order_number = WCOSPA_Utils::get_order_meta($post_id, '_wcospa_pronto_order_number', true);
 
             echo '<div class="wcospa-order-column">';
             if ($shipment_number) {
@@ -574,7 +574,7 @@ class WCOSPA_Admin_Orders_Column
             }
             echo '</div>';
         } elseif ($column === 'transaction_uuid') {
-            $transaction_uuid = get_post_meta($post_id, '_wcospa_transaction_uuid', true);
+            $transaction_uuid = WCOSPA_Utils::get_order_meta($post_id, '_wcospa_transaction_uuid', true);
             echo '<div class="wcospa-order-column">';
             if ($transaction_uuid) {
                 echo '<div class="transaction-uuid">' . esc_html($transaction_uuid) . '</div>';

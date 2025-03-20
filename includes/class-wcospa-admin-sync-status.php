@@ -3,7 +3,7 @@
  * Admin Sync Status functionality
  *
  * @package WCOSPA
- * @version 1.4.9
+ * @version 1.4.13
  */
 
 // Exit if accessed directly
@@ -88,8 +88,8 @@ class WCOSPA_Admin_Sync_Status
             }
 
             foreach ($orders as $order_id) {
-                delete_post_meta($order_id, '_wcospa_transaction_uuid');
-                delete_post_meta($order_id, '_wcospa_pronto_order_number');
+                WCOSPA_Utils::delete_order_meta($order_id, '_wcospa_transaction_uuid');
+                WCOSPA_Utils::delete_order_meta($order_id, '_wcospa_pronto_order_number');
             }
 
             wp_send_json_success(sprintf(

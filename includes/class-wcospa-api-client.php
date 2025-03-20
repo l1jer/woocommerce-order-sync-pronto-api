@@ -90,7 +90,7 @@ class WCOSPA_API_Client
             $transaction_uuid = $body_data['apitransactions'][0]['uuid'];
             
             // Store the UUID in order meta
-            $updated = update_post_meta($order_id, '_wcospa_transaction_uuid', $transaction_uuid);
+            $updated = WCOSPA_Utils::update_order_meta($order_id, '_wcospa_transaction_uuid', $transaction_uuid);
             
             if ($updated) {
                 self::log(sprintf('Successfully stored Transaction UUID: %s for order %d', 
@@ -142,7 +142,7 @@ class WCOSPA_API_Client
 
         try {
             // Retrieve the stored Transaction UUID
-            $transaction_uuid = get_post_meta($order_id, '_wcospa_transaction_uuid', true);
+            $transaction_uuid = WCOSPA_Utils::get_order_meta($order_id, '_wcospa_transaction_uuid', true);
             if (empty($transaction_uuid)) {
                 return new WP_Error('uuid_not_found', 'Transaction UUID not found in order.');
             }

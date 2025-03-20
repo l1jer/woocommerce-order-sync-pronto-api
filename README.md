@@ -110,6 +110,11 @@ This plugin is licensed under the GPLv2 or later. For more information, see http
 
 ### Changelog
 
+#### 1.4.13
+- **Improvement:** Updated plugin version for maintenance release
+- **Maintenance:** General code updates and compatibility checks
+- **Documentation:** Updated documentation for clarity and completeness
+
 #### 1.4.12
 - **Enhancement:** Changed order status name from "Pronto Received" to "Preparing to Ship" for better clarity
   - Updated status slug from `wc-pronto-received` to `wc-preparing-to-ship`
@@ -121,6 +126,10 @@ This plugin is licensed under the GPLv2 or later. For more information, see http
 - **Compatibility:** Tested and confirmed compatibility with WordPress 6.7.2, WooCommerce 9.6.0, and PHP 8.2+
   - Updated plugin metadata to reflect supported versions
   - Ensured all functionality works correctly with latest platform versions
+  - Added support for WooCommerce HPOS (High-Performance Order Storage)
+  - Implemented HPOS-compatible order meta handling with fallback to legacy methods
+  - Created new utility methods for backwards-compatible meta operations
+  - Refactored order meta access across the entire plugin for future-proof compatibility
 
 #### 1.4.11
 - **Bug Fix**: Fixed issue with shipment numbers being incorrectly stored when status code is not 80 or 90

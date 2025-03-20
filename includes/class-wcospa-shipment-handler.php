@@ -60,8 +60,8 @@ class WCOSPA_Shipment_Handler
     public static function schedule_shipment_tracking($order_id, $pronto_order_number)
     {
         // Store initial tracking attempt time
-        update_post_meta($order_id, '_wcospa_shipment_tracking_start', time());
-        update_post_meta($order_id, '_wcospa_shipment_tracking_attempts', 0);
+        WCOSPA_Utils::update_order_meta($order_id, '_wcospa_shipment_tracking_start', time());
+        WCOSPA_Utils::update_order_meta($order_id, '_wcospa_shipment_tracking_attempts', 0);
         
         // Schedule immediate tracking attempt
         wp_schedule_single_event(time(), 'wcospa_process_shipment_tracking');

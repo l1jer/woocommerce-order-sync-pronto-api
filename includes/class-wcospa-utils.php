@@ -5,7 +5,7 @@
  * Provides shared utility functions for the WCOSPA plugin.
  *
  * @package WCOSPA
- * @version 1.4.10
+ * @version 1.4.13
  */
 
 declare(strict_types=1);
@@ -87,5 +87,92 @@ class WCOSPA_Utils
         $day = (int) date('w', (int) $sydney_time);
         $hour = (int) date('G', (int) $sydney_time);
         return $day === 1 && $hour < 12; // Monday before noon
+    }
+
+    /**
+     * Get order meta data in an HPOS-compatible way
+     *
+     * @param int $order_id Order ID
+     * @param string $key Meta key
+     * @param bool $single Whether to return a single value (default: true)
+     * @return mixed The meta value
+     */
+    public static function get_order_meta($order_id, $key, $single = true)
+    {
+        $order = wc_get_order($order_id);
+        
+        if (!$order) {
+            return $single ? '' : [];
+        }
+        
+        // Check if we need to use HPOS or the legacy method
+        if (self::is_hpos_enabled()) {
+            return $order->get_meta($key, $single);
+        } else {
+            return get_post_meta($order_id, $key, $single);
+        }
+    }
+
+    /**
+     * Update order meta data in an HPOS-compatible way
+     *
+     * @param int $order_id Order ID
+     * @param string $key Meta key
+     * @param mixed $value Meta value
+     * @return mixed Result of the update
+     */
+    public static function update_order_meta($order_id, $key, $value)
+    {
+        $order = wc_get_order($order_id);
+        
+        if (!$order) {
+            return false;
+        }
+        
+        // Check if we need to use HPOS or the legacy method
+        if (self::is_hpos_enabled()) {
+            $order->update_meta_data($key, $value);
+            return $order->save();
+        } else {
+            return update_post_meta($order_id, $key, $value);
+        }
+    }
+
+    /**
+     * Delete order meta data in an HPOS-compatible way
+     *
+     * @param int $order_id Order ID
+     * @param string $key Meta key
+     * @return mixed Result of the deletion
+     */
+    public static function delete_order_meta($order_id, $key)
+    {
+        $order = wc_get_order($order_id);
+        
+        if (!$order) {
+            return false;
+        }
+        
+        // Check if we need to use HPOS or the legacy method
+        if (self::is_hpos_enabled()) {
+            $order->delete_meta_data($key);
+            return $order->save();
+        } else {
+            return delete_post_meta($order_id, $key);
+        }
+    }
+
+    /**
+     * Check if HPOS (Custom Order Tables) is enabled
+     *
+     * @return bool Whether HPOS is enabled
+     */
+    public static function is_hpos_enabled()
+    {
+        if (!class_exists('Automattic\WooCommerce\Utilities\OrderUtil')) {
+            return false;
+        }
+        
+        return \Automattic\WooCommerce\Utilities\OrderUtil::custom_orders_table_usage_is_enabled();
     }
 } 
