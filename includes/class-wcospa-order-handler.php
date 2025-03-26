@@ -596,6 +596,103 @@ WCOSPA_Admin_Orders_Column::init();
 
 class WCOSPA_Order_Data_Formatter
 {
+    // Default Debtor Code
+    const DEFAULT_DEBTOR_CODE = '210942';
+    // Default Afterpay Code
+    const DEFAULT_AFTERPAY_CODE = 'AFTER';
+    
+    /**
+     * Get the current debtor code based on the site URL
+     *
+     * @return string Debtor code
+     */
+    public static function get_debtor_code()
+    {
+        $site_url = site_url();
+        
+        // Check if debtor code is set in transient
+        $debtor_code = get_transient('wcospa_debtor_code');
+        if (!empty($debtor_code)) {
+            return $debtor_code;
+        }
+        
+        // Set debtor code based on site URL
+        if (strpos($site_url, 'zerotech.com.au') !== false || 
+            strpos($site_url, 'store.zerotechoptics.com') !== false) {
+            return self::DEFAULT_DEBTOR_CODE;
+        } elseif (strpos($site_url, 'nitecorewebsite.com.au') !== false) {
+            return '211023';
+        }
+        
+        // Default for all other sites
+        return self::DEFAULT_DEBTOR_CODE;
+    }
+    
+    /**
+     * Set a custom debtor code
+     *
+     * @param string $code The debtor code to set
+     * @return bool Success
+     */
+    public static function set_debtor_code($code)
+    {
+        if (empty($code)) {
+            return false;
+        }
+        
+        // Store in transient (1 week expiry)
+        set_transient('wcospa_debtor_code', $code, WEEK_IN_SECONDS);
+        
+        return true;
+    }
+    
+    /**
+     * Get the current Afterpay code based on the site URL
+     *
+     * @return string Afterpay code
+     */
+    public static function get_afterpay_code()
+    {
+        $site_url = site_url();
+        
+        // Check if Afterpay code is set in transient
+        $afterpay_code = get_transient('wcospa_afterpay_code');
+        if (!empty($afterpay_code)) {
+            return $afterpay_code;
+        }
+        
+        // Set Afterpay code based on site URL
+        if (strpos($site_url, 'zerotech.com.au') !== false || 
+            strpos($site_url, 'store.zerotechoptics.com') !== false) {
+            return self::DEFAULT_AFTERPAY_CODE;
+        } elseif (strpos($site_url, 'nitecoreaustralia.com.au') !== false) {
+            return 'AFPNIT';
+        } elseif (strpos($site_url, 'skywatcheraustralia.com.au') !== false) {
+            return 'AFPSKY';
+        }
+        
+        // Default for all other sites
+        return self::DEFAULT_AFTERPAY_CODE;
+    }
+    
+    /**
+     * Set a custom Afterpay code
+     *
+     * @param string $code The Afterpay code to set
+     * @return bool Success
+     */
+    public static function set_afterpay_code($code)
+    {
+        if (empty($code)) {
+            return false;
+        }
+        
+        // Store in transient (1 week expiry)
+        set_transient('wcospa_afterpay_code', $code, WEEK_IN_SECONDS);
+        
+        return true;
+    }
+
     public static function format_order($order, $customer_reference)
     {
         $order_data = $order->get_data();
@@ -657,7 +754,7 @@ class WCOSPA_Order_Data_Formatter
         // Return the formatted order data
         return [
             'customer_reference' => $customer_reference,
-            'debtor' => '210942',
+            'debtor' => self::get_debtor_code(),
             'delivery_address' => $delivery_address,
             'delivery_instructions' => $delivery_instructions,
             'payment' => [
@@ -699,7 +796,7 @@ class WCOSPA_Order_Data_Formatter
             case 'stripe_cc':
                 return 'STRIPE';
             case 'afterpay':
-                return 'AFTER';
+                return self::get_afterpay_code();
             default:
                 return '';
         }

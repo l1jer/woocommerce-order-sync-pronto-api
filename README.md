@@ -110,6 +110,26 @@ This plugin is licensed under the GPLv2 or later. For more information, see http
 
 ### Changelog
 
+#### 1.5.0
+- **Feature:** Added dynamic environment toggle for switching between Production and Test environments
+  - New UI on the Sync Status page for toggling between environments
+  - Environment state persists using transients without database modifications
+  - Visual indicators for current environment
+- **Feature:** Implemented dynamic debtor code configuration
+  - Default debtor code (210942) for zerotech.com.au and store.zerotechoptics.com
+  - Support for site-specific codes (211023 for nitecorewebsite.com.au)
+  - UI for viewing and editing the current debtor code
+  - Non-database persistence using transients
+- **Feature:** Added dynamic Afterpay code configuration
+  - Support for site-specific Afterpay codes:
+    - AFTER for zerotech.com.au and store.zerotechoptics.com
+    - AFPNIT for nitecoreaustralia.com.au
+    - AFPSKY for skywatcheraustralia.com.au
+  - UI for viewing and editing the current Afterpay code
+- **Improvement:** Enhanced UI with visual indicators for environment status
+- **Improvement:** Added comprehensive error handling and user feedback
+- **Compatibility:** Updated for PHP 8.2+, WooCommerce 9.7.1, and WordPress 6.7.2
+
 #### 1.4.12
 - **Enhancement:** Changed order status name from "Pronto Received" to "Preparing to Ship" for better clarity
   - Updated status slug from `wc-pronto-received` to `wc-preparing-to-ship`

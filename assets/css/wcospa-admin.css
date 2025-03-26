@@ -1,3 +1,11 @@
+/* ==========================================================================
+   WooCommerce Order Sync Pronto API - Admin Styles
+   ========================================================================== */
+
+/* ==========================================================================
+   1. Order List & Column Styles
+   ========================================================================== */
+
 .wcospa-order-column {
     display: flex;
     flex-direction: column;
@@ -37,19 +45,127 @@
     margin-top: 3px;
 }
 
-.fetch-order-button {
+.fetch-order-button, 
+.get-shipping-button {
     font-size: 11px !important;
     height: 24px !important;
     line-height: 22px !important;
     padding: 0 8px !important;
 }
 
-.fetch-order-button.loading {
+.fetch-order-button.loading,
+.get-shipping-button.loading {
     opacity: 0.7;
     cursor: not-allowed;
 }
 
-.fetch-order-button.loading::after {
+.fetch-order-button.loading::after,
+.get-shipping-button.loading::after {
+    content: "...";
+    display: inline-block;
+}
+
+/* ==========================================================================
+   2. Sync Status Page Styles
+   ========================================================================== */
+
+.wcospa-sync-status {
+    max-width: 900px;
+}
+
+.wcospa-settings-section {
+    background: #fff;
+    border: 1px solid #ddd;
+    margin-bottom: 20px;
+    padding: 15px 20px;
+    border-radius: 3px;
+    box-shadow: 0 1px 1px rgba(0,0,0,0.04);
+}
+
+.wcospa-settings-section h2 {
+    margin-top: 0;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #eee;
+}
+
+.wcospa-toggle-section, 
+.wcospa-input-section {
+    margin-bottom: 15px;
+}
+
+.wcospa-env-label {
+    display: inline-block;
+    padding: 3px 8px;
+    border-radius: 3px;
+    color: white;
+    font-size: 12px;
+    font-weight: bold;
+    text-transform: uppercase;
+}
+
+.env-production {
+    background-color: #388E3C;
+}
+
+.env-test {
+    background-color: #F57C00;
+}
+
+.wcospa-input-section label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: 600;
+}
+
+.wcospa-input-section input {
+    margin-right: 10px;
+}
+
+#wcospa-toggle-environment {
+    margin-top: 10px;
+}
+
+#wcospa-clear-all-sync-data {
+    background-color: #dc3545;
+    border-color: #dc3545;
+    color: white;
+}
+
+#wcospa-clear-all-sync-data:hover {
+    background-color: #c82333;
+    border-color: #bd2130;
+}
+
+/* ==========================================================================
+   3. Messages & Status Indicators
+   ========================================================================== */
+
+.wcospa-message {
+    padding: 10px 15px;
+    margin: 10px 0;
+    border-radius: 3px;
+    border-left: 4px solid #0073aa;
+    background-color: #f7f7f7;
+}
+
+.wcospa-message.success {
+    border-left-color: #46b450;
+}
+
+.wcospa-message.error {
+    border-left-color: #dc3232;
+}
+
+/* ==========================================================================
+   4. Loading States
+   ========================================================================== */
+
+.wcospa-loading {
+    opacity: 0.7;
+    pointer-events: none;
+}
+
+.wcospa-loading::after {
     content: "...";
     display: inline-block;
 }

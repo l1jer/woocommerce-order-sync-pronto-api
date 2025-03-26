@@ -68,57 +68,199 @@ document.addEventListener("DOMContentLoaded", function () {
                         alert("An error occurred: " + xhr.statusText);
                     }
                 };
-                xhr.send("action=wcospa_clear_all_sync_data");
+                xhr.send("action=wcospa_clear_all_sync_data&nonce=" + encodeURIComponent(wcospaAdmin.nonce));
             }
         });
     }
 
-    // Sync Order Buttons
-    // var syncButtons = document.querySelectorAll(".sync-order-button");
+    // Environment Toggle Button
+    var toggleEnvButton = document.getElementById("wcospa-toggle-environment");
+    if (toggleEnvButton) {
+        toggleEnvButton.addEventListener("click", function () {
+            const currentEnv = this.getAttribute("data-current");
+            const nonce = this.getAttribute("data-nonce");
+            const button = this;
+            
+            // Disable button during request
+            button.disabled = true;
+            button.classList.add("wcospa-loading");
+            
+            // Prepare form data
+            const formData = new FormData();
+            formData.append('action', 'wcospa_toggle_environment');
+            formData.append('current', currentEnv);
+            formData.append('nonce', nonce);
+            
+            // Make the AJAX request
+            fetch(ajaxurl, {
+                method: 'POST',
+                body: formData,
+                credentials: 'same-origin'
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Update UI
+                    const envLabel = document.querySelector('.wcospa-env-label');
+                    envLabel.textContent = data.data.is_production ? 'Production' : 'Test';
+                    envLabel.classList.remove('env-production', 'env-test');
+                    envLabel.classList.add(data.data.is_production ? 'env-production' : 'env-test');
+                    
+                    // Update button text and data
+                    button.textContent = data.data.is_production ? 'Switch to Test Environment' : 'Switch to Production Environment';
+                    button.setAttribute('data-current', data.data.environment);
+                    
+                    // Show success message
+                    showMessage('success', data.data.message);
+                } else {
+                    showMessage('error', data.data || 'Failed to update environment');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showMessage('error', 'Error updating environment settings');
+            })
+            .finally(() => {
+                // Re-enable button
+                button.disabled = false;
+                button.classList.remove("wcospa-loading");
+            });
+        });
+    }
+
+    // Debtor Code Update Button
+    var updateDebtorButton = document.getElementById("wcospa-update-debtor-code");
+    if (updateDebtorButton) {
+        updateDebtorButton.addEventListener("click", function () {
+            const codeInput = document.getElementById('wcospa-debtor-code');
+            const code = codeInput.value.trim();
+            const nonce = this.getAttribute("data-nonce");
+            const button = this;
+            
+            if (!code) {
+                showMessage('error', 'Debtor code cannot be empty');
+                return;
+            }
+            
+            // Disable button during request
+            button.disabled = true;
+            button.classList.add("wcospa-loading");
+            
+            // Prepare form data
+            const formData = new FormData();
+            formData.append('action', 'wcospa_update_debtor_code');
+            formData.append('code', code);
+            formData.append('nonce', nonce);
+            
+            // Make the AJAX request
+            fetch(ajaxurl, {
+                method: 'POST',
+                body: formData,
+                credentials: 'same-origin'
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Update UI
+                    document.getElementById('current-debtor-code').textContent = data.data.code;
+                    
+                    // Show success message
+                    showMessage('success', data.data.message);
+                } else {
+                    showMessage('error', data.data || 'Failed to update debtor code');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showMessage('error', 'Error updating debtor code');
+            })
+            .finally(() => {
+                // Re-enable button
+                button.disabled = false;
+                button.classList.remove("wcospa-loading");
+            });
+        });
+    }
+
+    // Afterpay Code Update Button
+    var updateAfterpayButton = document.getElementById("wcospa-update-afterpay-code");
+    if (updateAfterpayButton) {
+        updateAfterpayButton.addEventListener("click", function () {
+            const codeInput = document.getElementById('wcospa-afterpay-code');
+            const code = codeInput.value.trim();
+            const nonce = this.getAttribute("data-nonce");
+            const button = this;
+            
+            if (!code) {
+                showMessage('error', 'Afterpay code cannot be empty');
+                return;
+            }
+            
+            // Disable button during request
+            button.disabled = true;
+            button.classList.add("wcospa-loading");
+            
+            // Prepare form data
+            const formData = new FormData();
+            formData.append('action', 'wcospa_update_afterpay_code');
+            formData.append('code', code);
+            formData.append('nonce', nonce);
+            
+            // Make the AJAX request
+            fetch(ajaxurl, {
+                method: 'POST',
+                body: formData,
+                credentials: 'same-origin'
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Update UI
+                    document.getElementById('current-afterpay-code').textContent = data.data.code;
+                    
+                    // Show success message
+                    showMessage('success', data.data.message);
+                } else {
+                    showMessage('error', data.data || 'Failed to update Afterpay code');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showMessage('error', 'Error updating Afterpay code');
+            })
+            .finally(() => {
+                // Re-enable button
+                button.disabled = false;
+                button.classList.remove("wcospa-loading");
+            });
+        });
+    }
+
+    // Function to show messages
+    function showMessage(type, text) {
+        // Remove any existing messages
+        const existingMessages = document.querySelectorAll('.wcospa-message');
+        existingMessages.forEach(msg => msg.remove());
+        
+        // Create new message
+        const message = document.createElement('div');
+        message.className = `wcospa-message ${type}`;
+        message.textContent = text;
+        
+        // Insert after the h1
+        const h1 = document.querySelector('.wcospa-sync-status h1');
+        if (h1) {
+            h1.insertAdjacentElement('afterend', message);
+            
+            // Auto-remove after 5 seconds
+            setTimeout(() => {
+                message.remove();
+            }, 5000);
+        }
+    }
+
+    // Fetch Order Buttons handling
     var fetchButtons = document.querySelectorAll(".fetch-order-button");
-    // syncButtons.forEach(function (button) {
-    //     var orderId = button.getAttribute("data-order-id");
-    //     var syncStatus = localStorage.getItem("sync_status_" + orderId);
-    //     if (syncStatus === "true") {
-    //         button.textContent = "Synced";
-    //         button.disabled = true;
-    //         button.title = "Synced on " + new Date().toLocaleString(); // Add sync timestamp to tooltip
-    //     }
-    // });
-
-    // syncButtons.forEach(function (button) {
-    //     button.addEventListener("click", function () {
-    //         var orderId = button.getAttribute("data-order-id");
-    //         var nonce = button.getAttribute("data-nonce");
-    //         var fetchButton = document.querySelector('.fetch-order-button[data-order-id="' + orderId + '"]');
-
-    //         var xhr = new XMLHttpRequest();
-    //         xhr.open("POST", ajaxurl, true);
-    //         xhr.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
-    //         xhr.onload = function () {
-    //             if (xhr.status === 200) {
-    //                 var response = JSON.parse(xhr.responseText);
-    //                 if (response.success) {
-    //                     var countdown = 120;
-    //                     var countdownInterval = setInterval(function () {
-    //                         if (countdown > 0) {
-    //                             fetchButton.textContent = countdown + "s";
-    //                             fetchButton.disabled = true;
-    //                             countdown--;
-    //                         } else {
-    //                             clearInterval(countdownInterval);
-    //                             fetchButton.textContent = "Fetch";
-    //                             fetchButton.disabled = false;
-    //                         }
-    //                     }, 1000);
-    //                 }
-    //             }
-    //         };
-
-    //         xhr.send("action=wcospa_sync_order&order_id=" + encodeURIComponent(orderId) + "&security=" + encodeURIComponent(nonce));
-    //     });
-    // });
-
     function handleFetchButton(button) {
         var orderId = button.getAttribute("data-order-id");
         var syncTime = button.getAttribute("data-sync-time");
@@ -249,44 +391,44 @@ function handleFetchClick() {
         })
         .then(response => response.json())
         .then(data => {
+            // Check if we got a successful response with a Pronto order number
             if (data.success && data.data.pronto_order_number) {
                 // Success! Update the display and remove the button
                 orderNumberDiv.textContent = data.data.pronto_order_number;
                 button.closest('.wcospa-fetch-button-wrapper').remove();
             } else {
+                // Failed, check if we should retry
                 retryCount++;
                 if (retryCount < MAX_RETRIES) {
-                    // Schedule next retry
-                    orderNumberDiv.textContent = `Waiting ${RETRY_DELAY/1000}s for next attempt... (${retryCount}/${MAX_RETRIES})`;
+                    orderNumberDiv.textContent = `Retry in ${RETRY_DELAY/1000}s (${retryCount}/${MAX_RETRIES})`;
                     button.classList.remove('loading');
-                    button.disabled = true;
+                    
+                    // Schedule retry
                     setTimeout(fetchOrderNumber, RETRY_DELAY);
                 } else {
                     // Max retries reached
-                    orderNumberDiv.textContent = 'Failed to fetch after 5 attempts';
+                    const errorMessage = data.data || 'Failed to fetch order number after multiple attempts';
+                    orderNumberDiv.textContent = 'Fetch failed';
                     button.classList.remove('loading');
                     button.disabled = false;
+                    console.error('Fetch failed after max retries:', errorMessage);
                 }
             }
         })
         .catch(error => {
             console.error('Error:', error);
+            orderNumberDiv.textContent = 'Error';
+            button.classList.remove('loading');
+            button.disabled = false;
+            
+            // Retry on network errors
             retryCount++;
             if (retryCount < MAX_RETRIES) {
-                // Schedule next retry
-                orderNumberDiv.textContent = `Error occurred. Retrying in ${RETRY_DELAY/1000}s... (${retryCount}/${MAX_RETRIES})`;
-                button.classList.remove('loading');
-                button.disabled = true;
                 setTimeout(fetchOrderNumber, RETRY_DELAY);
-            } else {
-                // Max retries reached
-                orderNumberDiv.textContent = 'Failed to fetch after 5 attempts';
-                button.classList.remove('loading');
-                button.disabled = false;
             }
         });
     }
 
-    // Start the first fetch attempt
+    // Start the fetch process
     fetchOrderNumber();
 }
