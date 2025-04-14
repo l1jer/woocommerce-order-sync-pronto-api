@@ -620,7 +620,7 @@ class WCOSPA_Order_Data_Formatter
         if (strpos($site_url, 'zerotech.com.au') !== false || 
             strpos($site_url, 'store.zerotechoptics.com') !== false) {
             return self::DEFAULT_DEBTOR_CODE;
-        } elseif (strpos($site_url, 'nitecorewebsite.com.au') !== false) {
+        } elseif (strpos($site_url, 'nitecoreaustralia.com.au') !== false) {
             return '211023';
         }
         

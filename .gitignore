@@ -1,7 +1,11 @@
 .DS_Store
+includes/.DS_Store
+asserts/.DS_Store
+assets/css/.DS_Store
+assets/js/.DS_Store
 includes/wcospa-credentials.php
-.cursorrules
-Problems.md
+.cursor
+Order Sync Tasks.md
 
 # WordPress core files
 wp-config.php
