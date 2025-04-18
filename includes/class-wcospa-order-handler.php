@@ -29,10 +29,25 @@ class WCOSPA_Order_Handler
         add_action('woocommerce_order_status_processing', [__CLASS__, 'handle_order_sync'], 10, 1);
         add_action('wcospa_fetch_pronto_order_number', [__CLASS__, 'scheduled_fetch_pronto_order'], 10, 2);
         add_action('wcospa_process_pending_orders', [__CLASS__, 'process_pending_orders'], 10);
-        
+        // Register daily morning sync event
+        add_action('wcospa_daily_morning_sync', [__CLASS__, 'process_morning_preparing_to_ship_orders']);
         // Schedule recurring event for processing pending orders
         if (!wp_next_scheduled('wcospa_process_pending_orders')) {
             wp_schedule_event(time(), 'every_three_seconds', 'wcospa_process_pending_orders');
+        }
+        // Schedule daily morning sync at 6:00 AM Sydney time (weekdays only)
+        if (!wp_next_scheduled('wcospa_daily_morning_sync')) {
+            $sydney_timezone = new DateTimeZone('Australia/Sydney');
+            $now = new DateTime('now', $sydney_timezone);
+            $next_run = new DateTime('today 06:00', $sydney_timezone);
+            if ($now > $next_run) {
+                $next_run->modify('+1 day');
+            }
+            // Only schedule on weekdays (Monday to Friday)
+            while ((int)$next_run->format('N') > 5) {
+                $next_run->modify('+1 day');
+            }
+            wp_schedule_event($next_run->getTimestamp(), 'daily', 'wcospa_daily_morning_sync');
         }
     }
 
@@ -354,6 +369,56 @@ class WCOSPA_Order_Handler
                 // Regular orders use normal retry interval
                 $next_attempt_delay = self::RETRY_INTERVAL + (self::REQUEST_DELAY * ($order_id % 10));
                 wp_schedule_single_event(time() + $next_attempt_delay, 'wcospa_fetch_pronto_order_number', [$order_id, $retry_count + 1]);
+            }
+        }
+    }
+
+    /**
+     * Scheduled daily morning sync for "Preparing to Ship" orders
+     * Processes all orders in "Preparing to Ship" status missing Pronto order number or shipment number
+     */
+    public static function process_morning_preparing_to_ship_orders()
+    {
+        global $wpdb;
+        // Only run on weekdays (Monday to Friday)
+        $sydney_timezone = new DateTimeZone('Australia/Sydney');
+        $now = new DateTime('now', $sydney_timezone);
+        $weekday = (int)$now->format('N');
+        if ($weekday > 5) {
+            wc_get_logger()->info('Daily morning sync skipped: today is a weekend.', ['source' => 'wcospa']);
+            return;
+        }
+        // Query all orders in "Preparing to Ship" status
+        $orders = $wpdb->get_results(
+            $wpdb->prepare(
+                "SELECT ID FROM {$wpdb->posts} WHERE post_type = 'shop_order' AND post_status = %s",
+                'wc-preparing-to-ship'
+            )
+        );
+        if (empty($orders)) {
+            wc_get_logger()->info('No orders in "Preparing to Ship" status for daily morning sync.', ['source' => 'wcospa']);
+            return;
+        }
+        wc_get_logger()->info(sprintf('Daily morning sync: found %d orders in "Preparing to Ship" status.', count($orders)), ['source' => 'wcospa']);
+        foreach ($orders as $order_obj) {
+            $order_id = $order_obj->ID;
+            $has_pronto = get_post_meta($order_id, '_wcospa_pronto_order_number', true);
+            $has_shipment = get_post_meta($order_id, '_wcospa_shipment_number', true);
+            // If Pronto order number is missing, attempt to fetch
+            if (empty($has_pronto)) {
+                wc_get_logger()->info(sprintf('Order %d missing Pronto order number. Scheduling fetch.', $order_id), ['source' => 'wcospa']);
+                // Reset retry count and schedule fetch
+                update_post_meta($order_id, '_wcospa_fetch_retry_count', 0);
+                wp_schedule_single_event(time(), 'wcospa_fetch_pronto_order_number', [$order_id, 1]);
+            }
+            // If shipment number is missing but Pronto order number exists, attempt to fetch shipment
+            if (empty($has_shipment) && !empty($has_pronto)) {
+                wc_get_logger()->info(sprintf('Order %d missing shipment number. Attempting to fetch shipment.', $order_id), ['source' => 'wcospa']);
+                if (class_exists('WCOSPA_Shipment_Handler')) {
+                    WCOSPA_Shipment_Handler::fetch_shipment_number($order_id, 'cron');
+                } else {
+                    wc_get_logger()->warning(sprintf('Shipment handler not available for order %d.', $order_id), ['source' => 'wcospa']);
+                }
             }
         }
     }

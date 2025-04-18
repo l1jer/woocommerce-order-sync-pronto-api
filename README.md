@@ -110,6 +110,23 @@ This plugin is licensed under the GPLv2 or later. For more information, see http
 
 ### Changelog
 
+#### 1.5.3
+- **Feature:** Implemented a scheduled task that runs every weekday morning (6:00 AM Sydney time) to process all orders in the 'Preparing to Ship' status.
+  - For each such order, if the Pronto order number is missing, it attempts to retrieve it using the existing logic.
+  - If the shipment number is missing, it attempts to retrieve it using the existing logic.
+  - Ensures all past orders lacking either a Pronto order number or a shipment number are included in the process.
+  - Added detailed logging for traceability and debugging.
+  - Updated version references throughout the plugin for consistency.
+
+#### 1.5.2
+- **Improvement:** Enhanced weekend and Monday morning operations for better API synchronization
+  - Improved time detection logic for weekend and Monday morning processing
+  - Added detailed debug logging for time-related operations
+  - Updated timestamp handling to use consistent Sydney timezone (AEST) calculations
+  - Fixed issues with weekend order detection and Monday morning processing queue
+  - Ensured past orders without Pronto order numbers are properly processed on Monday mornings
+  - Updated version references throughout the plugin for consistency
+
 #### 1.5.0
 - **Feature:** Added dynamic environment toggle for switching between Production and Test environments
   - New UI on the Sync Status page for toggling between environments
