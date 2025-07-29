@@ -724,22 +724,32 @@ class WCOSPA_Bulk_Sync_Handler
                 continue;
             }
 
+            // Use the existing handle_order_sync method to ensure consistent behavior
+            // This method includes proper status change and scheduled action setup
             $result = WCOSPA_API_Client::sync_order($order_id);
 
             if (is_wp_error($result)) {
                 $errors[] = sprintf(__('Order %d: %s', 'wcospa'), $order_id, $result->get_error_message());
             } else {
+                // Use the existing logic from handle_order_sync method
+                $order->update_status('wc-preparing-to-ship', 'Order marked as Preparing to Ship after successful bulk sync.');
+                
+                // Store transaction UUID and sync time
                 update_post_meta($order_id, '_wcospa_transaction_uuid', $result);
                 update_post_meta($order_id, '_wcospa_sync_time', time());
                 update_post_meta($order_id, '_wcospa_fetch_retry_count', 0);
                 
-                // Update order status to preparing-to-ship
-                $order->update_status('wc-preparing-to-ship', 'Order marked as Preparing to Ship after bulk sync.');
-                
                 // Mark as weekend order if applicable
                 if (WCOSPA_Utils::is_weekend()) {
                     update_post_meta($order_id, '_wcospa_weekend_order', '1');
+                    wc_get_logger()->info(
+                        sprintf('Order %d marked as weekend order', $order_id),
+                        ['source' => 'wcospa']
+                    );
                 }
+                
+                // Schedule the first fetch attempt (same as individual sync)
+                wp_schedule_single_event(time() + WCOSPA_Order_Handler::INITIAL_WAIT, 'wcospa_fetch_pronto_order_number', [$order_id, 1]);
                 
                 $synced_count++;
                 
