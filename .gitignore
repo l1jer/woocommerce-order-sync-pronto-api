@@ -5,7 +5,7 @@ assets/css/.DS_Store
 assets/js/.DS_Store
 includes/wcospa-credentials.php
 .cursor
-Order Sync Tasks.md
+tasks.md
 
 # WordPress core files
 wp-config.php

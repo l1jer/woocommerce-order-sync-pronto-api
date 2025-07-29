@@ -46,7 +46,8 @@
 }
 
 .fetch-order-button, 
-.get-shipping-button {
+.get-shipping-button,
+.sync-order-button {
     font-size: 11px !important;
     height: 24px !important;
     line-height: 22px !important;
@@ -54,15 +55,30 @@
 }
 
 .fetch-order-button.loading,
-.get-shipping-button.loading {
+.get-shipping-button.loading,
+.sync-order-button.loading {
     opacity: 0.7;
     cursor: not-allowed;
 }
 
 .fetch-order-button.loading::after,
-.get-shipping-button.loading::after {
+.get-shipping-button.loading::after,
+.sync-order-button.loading::after {
     content: "...";
     display: inline-block;
+}
+
+/* ==========================================================================
+   3. Bulk Sync Button Styles
+   ========================================================================== */
+
+#wcospa-bulk-sync-processing {
+    margin-right: 8px;
+}
+
+#wcospa-bulk-sync-processing.loading {
+    opacity: 0.7;
+    cursor: not-allowed;
 }
 
 /* ==========================================================================

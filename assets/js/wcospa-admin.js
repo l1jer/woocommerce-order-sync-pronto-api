@@ -1,43 +1,4 @@
 document.addEventListener("DOMContentLoaded", function () {
-    // Clear Sync Logs button
-    // var clearLogsButton = document.getElementById("wcospa-clear-logs");
-    // if (clearLogsButton) {
-    //     clearLogsButton.addEventListener("click", function () {
-    //         if (
-    //             confirm(
-    //                 "Are you sure you want to clear all sync logs? This action cannot be undone."
-    //             )
-    //         ) {
-    //             var xhr = new XMLHttpRequest();
-    //             xhr.open("POST", ajaxurl, true);
-    //             xhr.setRequestHeader(
-    //                 "Content-Type",
-    //                 "application/x-www-form-urlencoded"
-    //             );
-    //             xhr.onload = function () {
-    //                 try {
-    //                     var response = JSON.parse(xhr.responseText);
-    //                     if (response.success) {
-    //                         fetchButton.textContent = "Fetched";
-    //                         prontoOrderDisplay.textContent =
-    //                             response.data.pronto_order_number; // Update the Pronto Order number display
-    //                         console.log("Fetch successful: ", response);
-    //                     } else {
-    //                         fetchButton.textContent = "Fetch";
-    //                         fetchButton.disabled = false;
-    //                         console.log("Fetch failed: ", response.data);
-    //                     }
-    //                 } catch (error) {
-    //                     console.error("Error parsing JSON response:", error);
-    //                     console.error("Response text:", xhr.responseText); // Log raw response for debugging
-    //                 }
-    //             };
-
-    //             xhr.send("action=wcospa_clear_sync_logs");
-    //         }
-    //     });
-    // }
-
     // Clear All Sync Data button
     var clearAllSyncDataButton = document.getElementById(
         "wcospa-clear-all-sync-data"
@@ -293,6 +254,19 @@ document.addEventListener("DOMContentLoaded", function () {
             button.removeEventListener('click', handleGetShippingClick);
             button.addEventListener('click', handleGetShippingClick);
         });
+
+        // Bind Sync Order buttons
+        document.querySelectorAll('.sync-order-button').forEach(function(button) {
+            button.removeEventListener('click', handleSyncOrderClick);
+            button.addEventListener('click', handleSyncOrderClick);
+        });
+
+        // Bind Bulk Sync Processing Orders button
+        const bulkSyncButton = document.getElementById('wcospa-bulk-sync-processing');
+        if (bulkSyncButton) {
+            bulkSyncButton.removeEventListener('click', handleBulkSyncClick);
+            bulkSyncButton.addEventListener('click', handleBulkSyncClick);
+        }
     }
 
     // Initial binding
@@ -353,6 +327,101 @@ document.addEventListener("DOMContentLoaded", function () {
             button.classList.remove('loading');
             button.disabled = false;
         });
+    }
+
+    // Define the click handler for Sync Order button
+    function handleSyncOrderClick(e) {
+        e.preventDefault();
+        const button = this;
+        const orderId = button.getAttribute('data-order-id');
+        const nonce = button.getAttribute('data-nonce');
+        const prontoOrderDiv = button.closest('.wcospa-order-column').querySelector('.pronto-order-number');
+
+        console.log('Sync Order clicked for order:', orderId); // Debug log
+
+        // Add loading state
+        button.classList.add('loading');
+        button.disabled = true;
+        prontoOrderDiv.textContent = 'Syncing order...';
+
+        // Prepare form data
+        const formData = new FormData();
+        formData.append('action', 'wcospa_sync_order');
+        formData.append('order_id', orderId);
+        formData.append('security', nonce);
+
+        // Make the AJAX request
+        fetch(ajaxurl, {
+            method: 'POST',
+            body: formData,
+            credentials: 'same-origin'
+        })
+        .then(response => {
+            console.log('Sync response received:', response); // Debug log
+            return response.json();
+        })
+        .then(data => {
+            console.log('Sync data received:', data); // Debug log
+            if (data.success && data.data.uuid) {
+                // Success! Update the display and remove the sync button, show awaiting status
+                prontoOrderDiv.textContent = 'Awaiting Pronto Order Number';
+                // Hide the sync button since the order is now synced
+                button.closest('.wcospa-fetch-button-wrapper').style.display = 'none';
+                
+                console.log('Sync successful, UUID:', data.data.uuid); // Debug log
+            } else {
+                // Failed to sync
+                const errorMessage = data.data || 'Failed to sync order';
+                prontoOrderDiv.textContent = 'Not synced';
+                button.classList.remove('loading');
+                button.disabled = false;
+                console.error('Sync failed:', errorMessage); // Debug log
+                
+                // Show error message temporarily
+                setTimeout(() => {
+                    if (prontoOrderDiv.textContent === 'Not synced') {
+                        // Only show alert if the status hasn't changed
+                        alert('Sync failed: ' + errorMessage);
+                    }
+                }, 100);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            prontoOrderDiv.textContent = 'Not synced';
+            button.classList.remove('loading');
+            button.disabled = false;
+            alert('Error syncing order: ' + error.message);
+        });
+    }
+
+    // Define the click handler for Bulk Sync Processing Orders button
+    function handleBulkSyncClick(e) {
+        e.preventDefault();
+        const button = this;
+        const nonce = button.getAttribute('data-nonce');
+
+        // Confirm the bulk action
+        const confirmMessage = 'Are you sure you want to sync all Processing orders with Pronto API? This may take a few moments.';
+        if (!confirm(confirmMessage)) {
+            return;
+        }
+
+        console.log('Bulk Sync Processing Orders clicked'); // Debug log
+
+        // Add loading state
+        button.classList.add('loading');
+        button.disabled = true;
+        const originalText = button.textContent;
+        button.textContent = 'Syncing orders...';
+
+        // Construct the URL with parameters
+        const url = new URL(window.location.href);
+        url.searchParams.set('wcospa_bulk_sync', '1');
+        url.searchParams.set('nonce', nonce);
+
+        // Navigate to the URL to trigger the bulk sync
+        window.location.href = url.toString();
     }
 });
 

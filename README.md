@@ -110,6 +110,25 @@ This plugin is licensed under the GPLv2 or later. For more information, see http
 
 ### Changelog
 
+#### 1.6.2
+- **Feature:** Added bulk "Sync Processing Orders" button to the Orders admin page (Task 1.6.2)
+  - New button appears next to the Filter button on the WooCommerce orders list page
+  - Syncs all orders currently in "Processing" status that haven't been synced yet
+  - Uses existing sync functionality without creating new functions
+  - Provides comprehensive user feedback with success/error notices
+  - Includes confirmation dialog and loading states for better UX
+  - Updates order status to "Preparing to Ship" after successful sync
+  - Includes proper error handling and logging for traceability
+
+#### 1.6.1
+- **Feature:** Added manual sync button for individual orders with "Processing" status (Task 1.6.1)
+  - New "Sync Order" button appears in the order list for Processing orders that haven't been synced yet
+  - Button triggers the existing order synchronization process for that specific order
+  - After successful sync, the button is hidden and status shows "Awaiting Pronto Order Number"
+  - Includes proper error handling and user feedback
+  - Uses existing `handle_ajax_sync()` functionality without creating new functions
+  - Added appropriate CSS styling and JavaScript event handling
+
 #### 1.5.3
 - **Feature:** Implemented a scheduled task that runs every weekday morning (6:00 AM Sydney time) to process all orders in the 'Preparing to Ship' status.
   - For each such order, if the Pronto order number is missing, it attempts to retrieve it using the existing logic.

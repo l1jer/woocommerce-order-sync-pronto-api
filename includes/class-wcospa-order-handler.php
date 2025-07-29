@@ -616,6 +616,12 @@ class WCOSPA_Admin_Orders_Column
                     echo '<div class="pronto-order-number">Legacy Order</div>';
                 } else {
                     echo '<div class="pronto-order-number">Not synced</div>';
+                    // Add sync button for Processing orders
+                    if ($order->get_status() === 'processing') {
+                        echo '<div class="wcospa-fetch-button-wrapper">';
+                        echo '<button type="button" class="button sync-order-button" data-order-id="' . esc_attr($post_id) . '" data-nonce="' . wp_create_nonce('wcospa_sync_order_nonce') . '">Sync Order</button>';
+                        echo '</div>';
+                    }
                 }
             }
             echo '</div>';
@@ -659,6 +665,159 @@ class WCOSPA_Admin_Orders_Column
 
 WCOSPA_Admin_Orders_Column::init();
 
+class WCOSPA_Bulk_Sync_Handler
+{
+    public static function init()
+    {
+        add_action('manage_posts_extra_tablenav', [__CLASS__, 'add_bulk_sync_button']);
+        add_action('admin_init', [__CLASS__, 'handle_bulk_sync_request']);
+        add_action('admin_enqueue_scripts', [__CLASS__, 'enqueue_scripts']);
+        add_action('admin_notices', [__CLASS__, 'show_bulk_sync_notices']);
+    }
+
+    public static function add_bulk_sync_button($which)
+    {
+        global $current_screen;
+        
+        // Only show on shop_order post type and on the top tablenav
+        if ($current_screen->post_type !== 'shop_order' || $which !== 'top') {
+            return;
+        }
+
+        echo '<div class="alignleft actions">';
+        echo '<button type="button" id="wcospa-bulk-sync-processing" class="button" data-nonce="' . wp_create_nonce('wcospa_bulk_sync_nonce') . '">';
+        echo __('Sync Processing Orders', 'wcospa');
+        echo '</button>';
+        echo '</div>';
+    }
+
+    public static function handle_bulk_sync_request()
+    {
+        if (!isset($_GET['wcospa_bulk_sync']) || !wp_verify_nonce($_GET['nonce'], 'wcospa_bulk_sync_nonce')) {
+            return;
+        }
+
+        if (!current_user_can('manage_woocommerce')) {
+            wp_die(__('You do not have permission to perform this action.', 'wcospa'));
+        }
+
+        // Get all Processing orders without transaction UUID
+        $args = [
+            'status' => 'processing',
+            'limit' => -1,
+            'meta_query' => [
+                [
+                    'key' => '_wcospa_transaction_uuid',
+                    'compare' => 'NOT EXISTS'
+                ]
+            ]
+        ];
+
+        $orders = wc_get_orders($args);
+        $synced_count = 0;
+        $errors = [];
+
+        foreach ($orders as $order) {
+            $order_id = $order->get_id();
+            
+            if (WCOSPA_Order_Handler::is_excluded_order($order)) {
+                continue;
+            }
+
+            $result = WCOSPA_API_Client::sync_order($order_id);
+
+            if (is_wp_error($result)) {
+                $errors[] = sprintf(__('Order %d: %s', 'wcospa'), $order_id, $result->get_error_message());
+            } else {
+                update_post_meta($order_id, '_wcospa_transaction_uuid', $result);
+                update_post_meta($order_id, '_wcospa_sync_time', time());
+                update_post_meta($order_id, '_wcospa_fetch_retry_count', 0);
+                
+                // Update order status to preparing-to-ship
+                $order->update_status('wc-preparing-to-ship', 'Order marked as Preparing to Ship after bulk sync.');
+                
+                // Mark as weekend order if applicable
+                if (WCOSPA_Utils::is_weekend()) {
+                    update_post_meta($order_id, '_wcospa_weekend_order', '1');
+                }
+                
+                $synced_count++;
+                
+                wc_get_logger()->info(
+                    sprintf('Bulk sync: Successfully synced order %d', $order_id),
+                    ['source' => 'wcospa']
+                );
+            }
+        }
+
+        // Prepare redirect with results
+        $redirect_args = [
+            'post_type' => 'shop_order',
+            'wcospa_bulk_sync_done' => 1,
+            'synced_count' => $synced_count,
+            'total_orders' => count($orders)
+        ];
+
+        if (!empty($errors)) {
+            $redirect_args['sync_errors'] = urlencode(implode('|', array_slice($errors, 0, 5))); // Limit to first 5 errors
+        }
+
+        wp_redirect(add_query_arg($redirect_args, admin_url('edit.php')));
+        exit;
+    }
+
+    public static function enqueue_scripts($hook)
+    {
+        if ($hook !== 'edit.php' || !isset($_GET['post_type']) || $_GET['post_type'] !== 'shop_order') {
+            return;
+        }
+
+        wp_enqueue_script('wcospa-admin', WCOSPA_URL . 'assets/js/wcospa-admin.js', ['jquery'], WCOSPA_VERSION, true);
+        wp_enqueue_style('wcospa-admin-style', WCOSPA_URL . 'assets/css/wcospa-admin.css', [], WCOSPA_VERSION);
+    }
+
+    public static function show_bulk_sync_notices()
+    {
+        if (!isset($_GET['wcospa_bulk_sync_done']) || !isset($_GET['post_type']) || $_GET['post_type'] !== 'shop_order') {
+            return;
+        }
+
+        $synced_count = intval($_GET['synced_count']);
+        $total_orders = intval($_GET['total_orders']);
+
+        if ($synced_count > 0) {
+            echo '<div class="notice notice-success is-dismissible">';
+            echo '<p>' . sprintf(
+                /* translators: %1$d: number of synced orders, %2$d: total processing orders */
+                __('Successfully synced %1$d out of %2$d Processing orders with Pronto API.', 'wcospa'),
+                $synced_count,
+                $total_orders
+            ) . '</p>';
+            echo '</div>';
+        }
+
+        if (isset($_GET['sync_errors'])) {
+            $errors = explode('|', urldecode($_GET['sync_errors']));
+            echo '<div class="notice notice-error is-dismissible">';
+            echo '<p><strong>' . __('Some orders failed to sync:', 'wcospa') . '</strong></p>';
+            echo '<ul>';
+            foreach ($errors as $error) {
+                echo '<li>' . esc_html($error) . '</li>';
+            }
+            echo '</ul>';
+            echo '</div>';
+        }
+
+        if ($synced_count === 0 && $total_orders === 0) {
+            echo '<div class="notice notice-info is-dismissible">';
+            echo '<p>' . __('No Processing orders found that need syncing.', 'wcospa') . '</p>';
+            echo '</div>';
+        }
+    }
+}
+
+WCOSPA_Bulk_Sync_Handler::init();
+
 class WCOSPA_Order_Data_Formatter
 {
     // Default Debtor Code
@@ -685,8 +844,12 @@ class WCOSPA_Order_Data_Formatter
         if (strpos($site_url, 'zerotech.com.au') !== false || 
             strpos($site_url, 'store.zerotechoptics.com') !== false) {
             return self::DEFAULT_DEBTOR_CODE;
+        } elseif (strpos($site_url, 'zerotechoutdoors.com.au') !== false) {
+            return '211027';
         } elseif (strpos($site_url, 'nitecoreaustralia.com.au') !== false) {
             return '211023';
+        } elseif (strpos($site_url, 'skywatcheraustralia.com.au') !== false) {
+            return '211026';
         }
         
         // Default for all other sites
@@ -728,7 +891,8 @@ class WCOSPA_Order_Data_Formatter
         
         // Set Afterpay code based on site URL
         if (strpos($site_url, 'zerotech.com.au') !== false || 
-            strpos($site_url, 'store.zerotechoptics.com') !== false) {
+            strpos($site_url, 'store.zerotechoptics.com') !== false ||
+            strpos($site_url, 'zerotechoutdoors.com.au') !== false) {
             return self::DEFAULT_AFTERPAY_CODE;
         } elseif (strpos($site_url, 'nitecoreaustralia.com.au') !== false) {
             return 'AFPNIT';
