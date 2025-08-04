@@ -20,33 +20,8 @@ class WCOSPA_Shipment_Handler
             wp_unschedule_event($timestamp, 'wcospa_process_shipment_tracking');
         }
 
-        // Schedule twice daily checks (11:55 AM and 4:55 PM Sydney time)
-        if (!wp_next_scheduled('wcospa_process_shipment_tracking_scheduled')) {
-            // Get current Sydney time
-            $sydney_timezone = new DateTimeZone('Australia/Sydney');
-            $sydney_time = new DateTime('now', $sydney_timezone);
-            $current_time = $sydney_time->format('H:i');
-            
-            // Set up morning schedule (11:55 AM)
-            $morning = new DateTime('today 11:55', $sydney_timezone);
-            if ($current_time > '11:55') {
-                $morning->modify('+1 day');
-            }
-            
-            // Set up afternoon schedule (4:55 PM)
-            $afternoon = new DateTime('today 16:55', $sydney_timezone);
-            if ($current_time > '16:55') {
-                $afternoon->modify('+1 day');
-            }
-            
-            // Only schedule on weekdays (Monday to Friday)
-            if ($morning->format('N') <= 5) {
-                wp_schedule_single_event($morning->getTimestamp(), 'wcospa_process_shipment_tracking_scheduled');
-            }
-            if ($afternoon->format('N') <= 5) {
-                wp_schedule_single_event($afternoon->getTimestamp(), 'wcospa_process_shipment_tracking_scheduled');
-            }
-        }
+        // Clear old shipment tracking schedule (now handled by new scheduled sync system)
+        wp_clear_scheduled_hook('wcospa_process_shipment_tracking_scheduled');
 
         // Add action hooks
         add_action('wcospa_process_shipment_tracking_scheduled', [__CLASS__, 'schedule_next_check']);
@@ -155,14 +130,14 @@ class WCOSPA_Shipment_Handler
                             }
 
                             // Log successful tracking addition with context
-                            wc_get_logger()->info(
+                            WCOSPA_Logger::info(
                                 sprintf('Successfully added tracking number %s to order %d with status code %s via %s', 
                                     $shipment_number, 
                                     $order_id,
                                     $status_code,
                                     strtoupper($context)
                                 ),
-                                ['source' => 'wcospa']
+                                ['order_id' => $order_id, 'tracking_number' => $shipment_number, 'status_code' => $status_code, 'context' => $context]
                             );
 
                             return [
@@ -216,6 +191,57 @@ class WCOSPA_Shipment_Handler
             ];
         }
         
+        // Check if this is a 524 timeout error and handle it specifically
+        if ($order_details->get_error_code() === 'siteground_524_timeout') {
+            // Log the 524 timeout error in shipment context
+            wc_get_logger()->error(
+                sprintf('524 timeout error during shipment number fetch for order %d via %s. Processing stopped to prevent false success.', 
+                    $order_id,
+                    strtoupper($context)
+                ),
+                [
+                    'source' => 'wcospa',
+                    'order_id' => $order_id,
+                    'context' => $context,
+                    'error_code' => $order_details->get_error_code(),
+                    'error_data' => $order_details->get_error_data()
+                ]
+            );
+            
+            return [
+                'success' => false,
+                'message' => sprintf('524 timeout error: %s', $order_details->get_error_message()),
+                'context' => $context,
+                'error_code' => 'siteground_524_timeout',
+                'critical_error' => true // Flag to indicate this is a critical server error
+            ];
+        }
+        
+        // Check for other server timeout errors
+        if ($order_details->get_error_code() === 'server_timeout_error') {
+            wc_get_logger()->error(
+                sprintf('Server timeout error during shipment number fetch for order %d via %s. Processing stopped.', 
+                    $order_id,
+                    strtoupper($context)
+                ),
+                [
+                    'source' => 'wcospa',
+                    'order_id' => $order_id,
+                    'context' => $context,
+                    'error_code' => $order_details->get_error_code(),
+                    'error_data' => $order_details->get_error_data()
+                ]
+            );
+            
+            return [
+                'success' => false,
+                'message' => sprintf('Server timeout error: %s', $order_details->get_error_message()),
+                'context' => $context,
+                'error_code' => 'server_timeout_error',
+                'critical_error' => true
+            ];
+        }
+        
         return [
             'success' => false,
             'message' => $order_details->get_error_message(),
@@ -235,7 +261,7 @@ class WCOSPA_Shipment_Handler
 
         // Check if tracking number is valid
         if (empty($tracking_number) || !is_string($tracking_number)) {
-            error_log("Invalid or empty tracking number for order {$order_id}");
+            WCOSPA_Logger::error("Invalid or empty tracking number for order {$order_id}", ['order_id' => $order_id]);
             return false;
         }
 
@@ -256,35 +282,21 @@ class WCOSPA_Shipment_Handler
             // Update order status to completed
             $order->update_status('completed', 'Order completed and tracking information added.');
             
-            error_log("Successfully added tracking number {$tracking_number} to order {$order_id}");
+            WCOSPA_Logger::info("Successfully added tracking number {$tracking_number} to order {$order_id}", ['order_id' => $order_id, 'tracking_number' => $tracking_number]);
             return true;
         }
 
-        error_log('Advanced Shipment Tracking plugin is not active');
+        WCOSPA_Logger::warning('Advanced Shipment Tracking plugin is not active');
         return false;
     }
 
     public static function schedule_next_check()
     {
-        // Schedule next check
-        $sydney_timezone = new DateTimeZone('Australia/Sydney');
-        $sydney_time = new DateTime('now', $sydney_timezone);
-        $current_time = $sydney_time->format('H:i');
-        
-        // Determine next check time
-        if ($current_time < '11:55') {
-            $next_check = new DateTime('today 11:55', $sydney_timezone);
-        } elseif ($current_time < '16:55') {
-            $next_check = new DateTime('today 16:55', $sydney_timezone);
-        } else {
-            $next_check = new DateTime('tomorrow 11:55', $sydney_timezone);
-        }
-        
-        // Only schedule on weekdays
-        while ($next_check->format('N') > 5) {
-            $next_check->modify('+1 day');
-        }
-        
-        wp_schedule_single_event($next_check->getTimestamp(), 'wcospa_process_shipment_tracking_scheduled');
+        // This method is now deprecated as scheduling is handled by WCOSPA_Scheduled_Sync_Handler
+        // Keep for backward compatibility but don't schedule anything
+        wc_get_logger()->debug(
+            'schedule_next_check called but scheduling is now handled by WCOSPA_Scheduled_Sync_Handler',
+            ['source' => 'wcospa']
+        );
     }
 } 
