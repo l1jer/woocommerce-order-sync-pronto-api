@@ -20,31 +20,30 @@ class WCOSPA_Shipment_Handler
             wp_unschedule_event($timestamp, 'wcospa_process_shipment_tracking');
         }
 
-        // Schedule twice daily checks (11:55 AM and 4:55 PM Sydney time)
+        // Schedule multiple daily checks (9:00 AM, 10:00 AM, 11:00 AM, 1:00 PM, 2:00 PM, 3:00 PM, 4:00 PM Sydney time)
         if (!wp_next_scheduled('wcospa_process_shipment_tracking_scheduled')) {
             // Get current Sydney time
             $sydney_timezone = new DateTimeZone('Australia/Sydney');
             $sydney_time = new DateTime('now', $sydney_timezone);
             $current_time = $sydney_time->format('H:i');
             
-            // Set up morning schedule (11:55 AM)
-            $morning = new DateTime('today 11:55', $sydney_timezone);
-            if ($current_time > '11:55') {
-                $morning->modify('+1 day');
-            }
+            // Define all check times (in 24-hour format)
+            $check_times = ['09:00', '10:00', '11:00', '13:00', '14:00', '15:00', '16:00'];
             
-            // Set up afternoon schedule (4:55 PM)
-            $afternoon = new DateTime('today 16:55', $sydney_timezone);
-            if ($current_time > '16:55') {
-                $afternoon->modify('+1 day');
-            }
-            
-            // Only schedule on weekdays (Monday to Friday)
-            if ($morning->format('N') <= 5) {
-                wp_schedule_single_event($morning->getTimestamp(), 'wcospa_process_shipment_tracking_scheduled');
-            }
-            if ($afternoon->format('N') <= 5) {
-                wp_schedule_single_event($afternoon->getTimestamp(), 'wcospa_process_shipment_tracking_scheduled');
+            foreach ($check_times as $time) {
+                $check_time = new DateTime('today ' . $time, $sydney_timezone);
+                
+                // If current time is past this check time, schedule for tomorrow
+                if ($current_time > $time) {
+                    $check_time->modify('+1 day');
+                }
+                
+                // Only schedule on weekdays (Monday to Friday)
+                while ($check_time->format('N') > 5) {
+                    $check_time->modify('+1 day');
+                }
+                
+                wp_schedule_single_event($check_time->getTimestamp(), 'wcospa_process_shipment_tracking_scheduled');
             }
         }
 
@@ -271,13 +270,21 @@ class WCOSPA_Shipment_Handler
         $sydney_time = new DateTime('now', $sydney_timezone);
         $current_time = $sydney_time->format('H:i');
         
-        // Determine next check time
-        if ($current_time < '11:55') {
-            $next_check = new DateTime('today 11:55', $sydney_timezone);
-        } elseif ($current_time < '16:55') {
-            $next_check = new DateTime('today 16:55', $sydney_timezone);
-        } else {
-            $next_check = new DateTime('tomorrow 11:55', $sydney_timezone);
+        // Define all check times (in 24-hour format)
+        $check_times = ['09:00', '10:00', '11:00', '13:00', '14:00', '15:00', '16:00'];
+        
+        // Find the next check time
+        $next_check = null;
+        foreach ($check_times as $time) {
+            if ($current_time < $time) {
+                $next_check = new DateTime('today ' . $time, $sydney_timezone);
+                break;
+            }
+        }
+        
+        // If no time found today, schedule for tomorrow
+        if (!$next_check) {
+            $next_check = new DateTime('tomorrow ' . $check_times[0], $sydney_timezone);
         }
         
         // Only schedule on weekdays

@@ -110,6 +110,14 @@ This plugin is licensed under the GPLv2 or later. For more information, see http
 
 ### Changelog
 
+#### 1.6.3
+- **Enhancement:** Expanded shipment tracking schedule for improved responsiveness
+  - Increased from 2 daily checks to 7 daily checks on weekdays
+  - New schedule: 9:00 AM, 10:00 AM, 11:00 AM, 1:00 PM, 2:00 PM, 3:00 PM, 4:00 PM (Sydney time)
+  - Improved logic for determining next check time in schedule_next_check() method
+  - Enhanced shipment tracking retrieval frequency for better order fulfilment tracking
+  - Maintains existing weekday-only processing and error handling mechanisms
+
 #### 1.6.2
 - **Feature:** Added bulk "Sync Processing Orders" button to the Orders admin page (Task 1.6.2)
   - New button appears next to the Filter button on the WooCommerce orders list page
