@@ -110,6 +110,14 @@ This plugin is licensed under the GPLv2 or later. For more information, see http
 
 ### Changelog
 
+#### 1.6.3b
+- **Enhancement:** Updated shipment tracking schedule with new business hours
+  - **Monday-Thursday**: 8:00 AM, 9:00 AM, 10:00 AM, 11:00 AM, 1:00 PM, 5:00 PM (Sydney time)
+  - **Friday**: 8:00 AM, 9:00 AM, 10:00 AM, 11:00 AM, 1:00 PM only (no 5:00 PM)
+  - **Weekends**: No processing (Saturday and Sunday)
+  - Improved scheduling logic to handle different schedules for weekdays vs Friday
+  - Enhanced next check time calculation for proper day transitions
+
 #### 1.6.3a
 - **Refactor:** Removed morning sync check and weekend order processing functionality
   - Removed daily morning sync at 6:00 AM Sydney time (weekdays)

@@ -20,17 +20,21 @@ class WCOSPA_Shipment_Handler
             wp_unschedule_event($timestamp, 'wcospa_process_shipment_tracking');
         }
 
-        // Schedule multiple daily checks (9:00 AM, 10:00 AM, 11:00 AM, 1:00 PM, 2:00 PM, 3:00 PM, 4:00 PM Sydney time)
+        // Schedule multiple daily checks (8:00 AM, 9:00 AM, 10:00 AM, 11:00 AM, 1:00 PM, 5:00 PM Sydney time)
+        // Monday-Thursday: All times, Friday: 8:00 AM, 9:00 AM, 10:00 AM, 11:00 AM, 1:00 PM only
         if (!wp_next_scheduled('wcospa_process_shipment_tracking_scheduled')) {
             // Get current Sydney time
             $sydney_timezone = new DateTimeZone('Australia/Sydney');
             $sydney_time = new DateTime('now', $sydney_timezone);
             $current_time = $sydney_time->format('H:i');
             
-            // Define all check times (in 24-hour format)
-            $check_times = ['09:00', '10:00', '11:00', '13:00', '14:00', '15:00', '16:00'];
+            // Define check times for Monday-Thursday (in 24-hour format)
+            $weekday_times = ['08:00', '09:00', '10:00', '11:00', '13:00', '17:00'];
             
-            foreach ($check_times as $time) {
+            // Define check times for Friday (in 24-hour format) - no 5:00 PM
+            $friday_times = ['08:00', '09:00', '10:00', '11:00', '13:00'];
+            
+            foreach ($weekday_times as $time) {
                 $check_time = new DateTime('today ' . $time, $sydney_timezone);
                 
                 // If current time is past this check time, schedule for tomorrow
@@ -41,6 +45,11 @@ class WCOSPA_Shipment_Handler
                 // Only schedule on weekdays (Monday to Friday)
                 while ($check_time->format('N') > 5) {
                     $check_time->modify('+1 day');
+                }
+                
+                // For Friday, skip 5:00 PM
+                if ($check_time->format('N') == 5 && $time == '17:00') {
+                    continue;
                 }
                 
                 wp_schedule_single_event($check_time->getTimestamp(), 'wcospa_process_shipment_tracking_scheduled');
@@ -269,9 +278,16 @@ class WCOSPA_Shipment_Handler
         $sydney_timezone = new DateTimeZone('Australia/Sydney');
         $sydney_time = new DateTime('now', $sydney_timezone);
         $current_time = $sydney_time->format('H:i');
+        $current_day = (int)$sydney_time->format('N'); // 1=Monday, 5=Friday
         
-        // Define all check times (in 24-hour format)
-        $check_times = ['09:00', '10:00', '11:00', '13:00', '14:00', '15:00', '16:00'];
+        // Define check times for Monday-Thursday (in 24-hour format)
+        $weekday_times = ['08:00', '09:00', '10:00', '11:00', '13:00', '17:00'];
+        
+        // Define check times for Friday (in 24-hour format) - no 5:00 PM
+        $friday_times = ['08:00', '09:00', '10:00', '11:00', '13:00'];
+        
+        // Use appropriate times based on current day
+        $check_times = ($current_day == 5) ? $friday_times : $weekday_times;
         
         // Find the next check time
         $next_check = null;
@@ -284,12 +300,18 @@ class WCOSPA_Shipment_Handler
         
         // If no time found today, schedule for tomorrow
         if (!$next_check) {
-            $next_check = new DateTime('tomorrow ' . $check_times[0], $sydney_timezone);
+            // Determine tomorrow's schedule
+            $tomorrow_day = ($current_day == 5) ? 1 : $current_day + 1; // Friday -> Monday
+            $tomorrow_times = ($tomorrow_day == 5) ? $friday_times : $weekday_times;
+            $next_check = new DateTime('tomorrow ' . $tomorrow_times[0], $sydney_timezone);
         }
         
         // Only schedule on weekdays
         while ($next_check->format('N') > 5) {
             $next_check->modify('+1 day');
+            // Update check times for the new day
+            $new_day = (int)$next_check->format('N');
+            $check_times = ($new_day == 5) ? $friday_times : $weekday_times;
         }
         
         wp_schedule_single_event($next_check->getTimestamp(), 'wcospa_process_shipment_tracking_scheduled');
