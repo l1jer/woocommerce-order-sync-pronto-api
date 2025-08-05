@@ -68,59 +68,5 @@ class WCOSPA_Utils
         }
     }
 
-    /**
-     * Check if current time is weekend in Sydney
-     * 
-     * @return bool True if current Sydney time is Saturday or Sunday
-     */
-    public static function is_weekend(): bool
-    {
-        // Get current Sydney time
-        $sydney_time = self::get_sydney_time('Y-m-d H:i:s');
-        $timestamp = strtotime($sydney_time);
-        $day = (int) date('w', $timestamp);
-        
-        $is_weekend = ($day === 0 || $day === 6); // 0 = Sunday, 6 = Saturday
-        
-        // Add detailed logging for debugging time-related issues
-        wc_get_logger()->debug(
-            sprintf('Weekend check: Sydney time: %s, Day: %d, Is weekend: %s', 
-                $sydney_time,
-                $day,
-                $is_weekend ? 'Yes' : 'No'
-            ),
-            ['source' => 'wcospa']
-        );
-        
-        return $is_weekend;
-    }
 
-    /**
-     * Check if current time is Monday morning in Sydney
-     * 
-     * @return bool True if current Sydney time is Monday before noon
-     */
-    public static function is_monday_morning(): bool
-    {
-        // Get current Sydney time
-        $sydney_time = self::get_sydney_time('Y-m-d H:i:s');
-        $timestamp = strtotime($sydney_time);
-        $day = (int) date('w', $timestamp);
-        $hour = (int) date('G', $timestamp);
-        
-        $is_monday_morning = ($day === 1 && $hour < 12); // Monday before noon
-        
-        // Add detailed logging for debugging time-related issues
-        wc_get_logger()->debug(
-            sprintf('Monday morning check: Sydney time: %s, Day: %d, Hour: %d, Is Monday morning: %s', 
-                $sydney_time,
-                $day,
-                $hour,
-                $is_monday_morning ? 'Yes' : 'No'
-            ),
-            ['source' => 'wcospa']
-        );
-        
-        return $is_monday_morning;
-    }
 } 

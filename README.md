@@ -110,6 +110,14 @@ This plugin is licensed under the GPLv2 or later. For more information, see http
 
 ### Changelog
 
+#### 1.6.3a
+- **Refactor:** Removed morning sync check and weekend order processing functionality
+  - Removed daily morning sync at 6:00 AM Sydney time (weekdays)
+  - Removed weekend order handling with special Monday morning processing
+  - Removed weekend order marking and retry logic
+  - Simplified order processing to focus on core functionality
+  - Maintains enhanced shipment tracking schedule from 1.6.3
+
 #### 1.6.3
 - **Enhancement:** Expanded shipment tracking schedule for improved responsiveness
   - Increased from 2 daily checks to 7 daily checks on weekdays
