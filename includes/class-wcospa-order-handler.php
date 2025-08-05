@@ -35,8 +35,20 @@ class WCOSPA_Order_Handler
         if (!wp_next_scheduled('wcospa_process_pending_orders')) {
             wp_schedule_event(time(), 'every_three_seconds', 'wcospa_process_pending_orders');
         }
-        // Clear old daily morning sync schedule (replaced by new scheduled sync system)
-        wp_clear_scheduled_hook('wcospa_daily_morning_sync');
+        // Schedule daily morning sync at 6:00 AM Sydney time (weekdays only)
+        if (!wp_next_scheduled('wcospa_daily_morning_sync')) {
+            $sydney_timezone = new DateTimeZone('Australia/Sydney');
+            $now = new DateTime('now', $sydney_timezone);
+            $next_run = new DateTime('today 06:00', $sydney_timezone);
+            if ($now > $next_run) {
+                $next_run->modify('+1 day');
+            }
+            // Only schedule on weekdays (Monday to Friday)
+            while ((int)$next_run->format('N') > 5) {
+                $next_run->modify('+1 day');
+            }
+            wp_schedule_event($next_run->getTimestamp(), 'daily', 'wcospa_daily_morning_sync');
+        }
     }
 
     /**
@@ -87,10 +99,6 @@ class WCOSPA_Order_Handler
     {
         // Clear scheduled hooks
         wp_clear_scheduled_hook('wcospa_process_pending_orders');
-        wp_clear_scheduled_hook('wcospa_daily_morning_sync');
-        
-        // Clear new scheduled sync events
-        WCOSPA_Scheduled_Sync_Handler::clear_scheduled_events();
         
         // Remove current activation time
         delete_option('wcospa_current_activation_time');
@@ -108,9 +116,9 @@ class WCOSPA_Order_Handler
         $response = WCOSPA_API_Client::sync_order($order_id);
 
         if (is_wp_error($response)) {
-            WCOSPA_Logger::error(
+            wc_get_logger()->error(
                 sprintf('Order sync failed: %s', $response->get_error_message()),
-                ['order_id' => $order_id]
+                ['source' => 'wcospa']
             );
         } else {
             $order = wc_get_order($order_id);
@@ -124,9 +132,9 @@ class WCOSPA_Order_Handler
             // Mark as weekend order if applicable
             if (WCOSPA_Utils::is_weekend()) {
                 update_post_meta($order_id, '_wcospa_weekend_order', '1');
-                WCOSPA_Logger::info(
+                wc_get_logger()->info(
                     sprintf('Order %d marked as weekend order', $order_id),
-                    ['order_id' => $order_id]
+                    ['source' => 'wcospa']
                 );
             }
             
@@ -202,30 +210,13 @@ class WCOSPA_Order_Handler
                         ['source' => 'wcospa']
                     );
                 } else {
-                    // Check for critical server errors (524 timeout or other server errors)
-                    if (isset($result['critical_error']) && $result['critical_error']) {
-                        wc_get_logger()->error(
-                            sprintf('Critical server error during automatic shipment fetch for order %d: %s. Automatic processing halted.', 
-                                $order_id,
-                                $result['message']
-                            ),
-                            [
-                                'source' => 'wcospa',
-                                'error_code' => isset($result['error_code']) ? $result['error_code'] : 'unknown',
-                                'auto_processing_halted' => true
-                            ]
-                        );
-                        // Don't continue processing if we hit a critical server error
-                        return;
-                    } else {
-                        wc_get_logger()->debug(
-                            sprintf('Could not fetch shipment number for order %d: %s', 
-                                $order_id,
-                                $result['message']
-                            ),
-                            ['source' => 'wcospa']
-                        );
-                    }
+                    wc_get_logger()->debug(
+                        sprintf('Could not fetch shipment number for order %d: %s', 
+                            $order_id,
+                            $result['message']
+                        ),
+                        ['source' => 'wcospa']
+                    );
                 }
             }
         } else {
@@ -237,9 +228,9 @@ class WCOSPA_Order_Handler
                 // Calculate delay for next attempt (includes 3-second spacing between orders)
                 $next_attempt_delay = self::RETRY_INTERVAL + (self::REQUEST_DELAY * ($order_id % 10));
                 wp_schedule_single_event(time() + $next_attempt_delay, 'wcospa_fetch_pronto_order_number', [$order_id, $retry_count + 1]);
-                            WCOSPA_Logger::info("Scheduled retry #{$retry_count} for order {$order_id} in {$next_attempt_delay} seconds", ['order_id' => $order_id, 'retry_count' => $retry_count]);
-        } else {
-            WCOSPA_Logger::error("Failed to fetch Pronto Order Number for order {$order_id} after {$retry_count} attempts", ['order_id' => $order_id, 'retry_count' => $retry_count]);
+                error_log("Scheduled retry #{$retry_count} for order {$order_id} in {$next_attempt_delay} seconds");
+            } else {
+                error_log("Failed to fetch Pronto Order Number for order {$order_id} after {$retry_count} attempts");
             }
         }
     }
@@ -680,10 +671,8 @@ class WCOSPA_Bulk_Sync_Handler
     {
         add_action('manage_posts_extra_tablenav', [__CLASS__, 'add_bulk_sync_button']);
         add_action('admin_init', [__CLASS__, 'handle_bulk_sync_request']);
-        add_action('admin_init', [__CLASS__, 'handle_bulk_shipping_request']);
         add_action('admin_enqueue_scripts', [__CLASS__, 'enqueue_scripts']);
         add_action('admin_notices', [__CLASS__, 'show_bulk_sync_notices']);
-        add_action('admin_notices', [__CLASS__, 'show_bulk_shipping_notices']);
     }
 
     public static function add_bulk_sync_button($which)
@@ -698,9 +687,6 @@ class WCOSPA_Bulk_Sync_Handler
         echo '<div class="alignleft actions">';
         echo '<button type="button" id="wcospa-bulk-sync-processing" class="button" data-nonce="' . wp_create_nonce('wcospa_bulk_sync_nonce') . '">';
         echo __('Sync Processing Orders', 'wcospa');
-        echo '</button>';
-        echo '<button type="button" id="wcospa-bulk-get-shipping" class="button" data-nonce="' . wp_create_nonce('wcospa_bulk_shipping_nonce') . '">';
-        echo __('Obtain Shipping Number', 'wcospa');
         echo '</button>';
         echo '</div>';
     }
@@ -790,111 +776,6 @@ class WCOSPA_Bulk_Sync_Handler
         exit;
     }
 
-    public static function handle_bulk_shipping_request()
-    {
-        if (!isset($_GET['wcospa_bulk_shipping']) || !wp_verify_nonce($_GET['nonce'], 'wcospa_bulk_shipping_nonce')) {
-            return;
-        }
-
-        if (!current_user_can('manage_woocommerce')) {
-            wp_die(__('You do not have permission to perform this action.', 'wcospa'));
-        }
-
-        // Get all "Preparing to Ship" orders with Pronto order number but no shipment number
-        $args = [
-            'status' => 'wc-preparing-to-ship',
-            'limit' => -1,
-            'meta_query' => [
-                'relation' => 'AND',
-                [
-                    'key' => '_wcospa_pronto_order_number',
-                    'compare' => 'EXISTS'
-                ],
-                [
-                    'key' => '_wcospa_shipment_number',
-                    'compare' => 'NOT EXISTS'
-                ]
-            ]
-        ];
-
-        $orders = wc_get_orders($args);
-        $processed_count = 0;
-        $success_count = 0;
-        $errors = [];
-
-        foreach ($orders as $order) {
-            $order_id = $order->get_id();
-            
-            if (WCOSPA_Order_Handler::is_excluded_order($order)) {
-                continue;
-            }
-
-            $processed_count++;
-
-            // Use existing shipment handler function
-            $result = WCOSPA_Shipment_Handler::fetch_shipment_number($order_id, 'bulk');
-
-            if ($result['success']) {
-                $success_count++;
-                
-                wc_get_logger()->info(
-                    sprintf('Bulk shipping: Successfully obtained shipment number %s for order %d with status code %s', 
-                        $result['shipment_number'], 
-                        $order_id,
-                        $result['status_code']
-                    ),
-                    ['source' => 'wcospa']
-                );
-            } else {
-                // Check for critical server errors (524 timeout or other server errors)
-                if (isset($result['critical_error']) && $result['critical_error']) {
-                    $errors[] = sprintf(__('CRITICAL ERROR - Order %d: %s. Bulk processing stopped.', 'wcospa'), $order_id, $result['message']);
-                    wc_get_logger()->error(
-                        sprintf('Bulk shipping: Critical server error for order %d: %s. Stopping bulk processing to prevent further issues.', $order_id, $result['message']),
-                        [
-                            'source' => 'wcospa',
-                            'error_code' => isset($result['error_code']) ? $result['error_code'] : 'unknown',
-                            'bulk_processing_stopped' => true
-                        ]
-                    );
-                    // Stop processing immediately on critical server errors
-                    break;
-                } else {
-                    $errors[] = sprintf(__('Order %d: %s', 'wcospa'), $order_id, $result['message']);
-                    
-                    wc_get_logger()->debug(
-                        sprintf('Bulk shipping: Failed to obtain shipment number for order %d: %s', 
-                            $order_id,
-                            $result['message']
-                        ),
-                        ['source' => 'wcospa']
-                    );
-                }
-            }
-
-            // Add a small delay between requests as per task requirements to process sequentially
-            if ($processed_count < count($orders)) {
-                sleep(1); // 1 second delay between orders
-            }
-        }
-
-        // Prepare redirect with results
-        $redirect_args = [
-            'post_type' => 'shop_order',
-            'wcospa_bulk_shipping_done' => 1,
-            'shipping_processed' => $processed_count,
-            'shipping_success' => $success_count,
-            'total_shipping_orders' => count($orders)
-        ];
-
-        if (!empty($errors)) {
-            $redirect_args['shipping_errors'] = urlencode(implode('|', array_slice($errors, 0, 5))); // Limit to first 5 errors
-        }
-
-        wp_redirect(add_query_arg($redirect_args, admin_url('edit.php')));
-        exit;
-    }
-
     public static function enqueue_scripts($hook)
     {
         if ($hook !== 'edit.php' || !isset($_GET['post_type']) || $_GET['post_type'] !== 'shop_order') {
@@ -943,389 +824,9 @@ class WCOSPA_Bulk_Sync_Handler
             echo '</div>';
         }
     }
-
-    public static function show_bulk_shipping_notices()
-    {
-        if (!isset($_GET['wcospa_bulk_shipping_done']) || !isset($_GET['post_type']) || $_GET['post_type'] !== 'shop_order') {
-            return;
-        }
-
-        $processed_count = intval($_GET['shipping_processed']);
-        $success_count = intval($_GET['shipping_success']);
-        $total_orders = intval($_GET['total_shipping_orders']);
-
-        if ($success_count > 0) {
-            echo '<div class="notice notice-success is-dismissible">';
-            echo '<p>' . sprintf(
-                /* translators: %1$d: number of successful shipments, %2$d: total processed orders, %3$d: total orders found */
-                __('Successfully obtained shipment numbers for %1$d out of %2$d processed orders. Total "Preparing to Ship" orders found: %3$d.', 'wcospa'),
-                $success_count,
-                $processed_count,
-                $total_orders
-            ) . '</p>';
-            echo '</div>';
-        }
-
-        if (isset($_GET['shipping_errors'])) {
-            $errors = explode('|', urldecode($_GET['shipping_errors']));
-            echo '<div class="notice notice-error is-dismissible">';
-            echo '<p><strong>' . __('Some orders failed to obtain shipment numbers:', 'wcospa') . '</strong></p>';
-            echo '<ul>';
-            foreach ($errors as $error) {
-                echo '<li>' . esc_html($error) . '</li>';
-            }
-            echo '</ul>';
-            echo '</div>';
-        }
-
-        if ($processed_count === 0 && $total_orders === 0) {
-            echo '<div class="notice notice-info is-dismissible">';
-            echo '<p>' . __('No "Preparing to Ship" orders found that need shipment numbers.', 'wcospa') . '</p>';
-            echo '</div>';
-        } elseif ($processed_count === 0 && $total_orders > 0) {
-            echo '<div class="notice notice-info is-dismissible">';
-            echo '<p>' . sprintf(
-                /* translators: %d: number of orders found */
-                __('Found %d "Preparing to Ship" orders, but none were eligible for shipment number processing (may be excluded orders).', 'wcospa'),
-                $total_orders
-            ) . '</p>';
-            echo '</div>';
-        }
-    }
 }
 
 WCOSPA_Bulk_Sync_Handler::init();
-
-class WCOSPA_Scheduled_Sync_Handler
-{
-    const HOOK_NAME = 'wcospa_scheduled_sync_action';
-
-    public static function init()
-    {
-        // Prevent multiple initializations
-        static $initialized = false;
-        if ($initialized) {
-            return;
-        }
-        $initialized = true;
-        
-        add_action(self::HOOK_NAME, [__CLASS__, 'run_scheduled_sync']);
-        
-        // Check server cron configuration once during initialization
-        self::check_server_cron_configuration();
-        
-        // Schedule the sync events
-        self::schedule_sync_events();
-        
-        WCOSPA_Logger::info(
-            'WCOSPA_Scheduled_Sync_Handler initialized',
-            ['hook_registered' => self::HOOK_NAME, 'initialization_time' => date('Y-m-d H:i:s')]
-        );
-    }
-
-    /**
-     * Schedule sync events according to the new requirements:
-     * Monday-Thursday: 9:00 AM, 12:00 PM, 2:00 PM, 5:30 PM
-     * Friday: 9:00 AM, 12:00 PM
-     */
-    public static function schedule_sync_events()
-    {
-        // Prevent excessive rescheduling
-        static $last_scheduling_time = 0;
-        $current_time = time();
-        
-        // Only reschedule if it's been more than 1 hour since last scheduling
-        if ($current_time - $last_scheduling_time < 3600) {
-            WCOSPA_Logger::debug(
-                'Skipping rescheduling - too soon since last schedule',
-                ['last_scheduling' => $last_scheduling_time, 'current_time' => $current_time]
-            );
-            return;
-        }
-        
-        $last_scheduling_time = $current_time;
-        
-        $sydney_timezone = new DateTimeZone('Australia/Sydney');
-        $now = new DateTime('now', $sydney_timezone);
-        
-        WCOSPA_Logger::info(
-            'Starting to schedule sync events',
-            ['current_sydney_time' => $now->format('Y-m-d H:i:s')]
-        );
-        
-        // Clear any existing scheduled events
-        wp_clear_scheduled_hook(self::HOOK_NAME);
-        
-        // Define the schedule times
-        $schedule_times = [
-            'monday' => ['09:00', '12:00', '14:00', '17:30'],
-            'tuesday' => ['09:00', '12:00', '14:00', '17:30'],
-            'wednesday' => ['09:00', '12:00', '14:00', '17:30'],
-            'thursday' => ['09:00', '12:00', '14:00', '17:30'],
-            'friday' => ['09:00', '12:00']
-        ];
-        
-        $scheduled_count = 0;
-        
-        // Schedule events for the next 7 days to ensure coverage
-        for ($day = 0; $day < 7; $day++) {
-            $target_date = clone $now;
-            $target_date->modify("+{$day} days");
-            
-            $day_name = strtolower($target_date->format('l'));
-            
-            if (!isset($schedule_times[$day_name])) {
-                WCOSPA_Logger::debug(
-                    sprintf('Skipping %s (weekend)', $day_name),
-                    ['day' => $day_name, 'date' => $target_date->format('Y-m-d')]
-                );
-                continue; // Skip weekends
-            }
-            
-            foreach ($schedule_times[$day_name] as $time) {
-                $scheduled_time = new DateTime($target_date->format('Y-m-d') . ' ' . $time, $sydney_timezone);
-                
-                // Only schedule future events
-                if ($scheduled_time > $now) {
-                    $result = wp_schedule_single_event($scheduled_time->getTimestamp(), self::HOOK_NAME);
-                    
-                    if ($result !== false) {
-                        $scheduled_count++;
-                        WCOSPA_Logger::info(
-                            sprintf('Successfully scheduled sync event for %s at %s Sydney time', 
-                                $scheduled_time->format('Y-m-d'), 
-                                $time
-                            ),
-                            [
-                                'scheduled_for' => $scheduled_time->format('Y-m-d H:i:s'), 
-                                'day' => $day_name, 
-                                'time' => $time,
-                                'timestamp' => $scheduled_time->getTimestamp()
-                            ]
-                        );
-                    } else {
-                        WCOSPA_Logger::error(
-                            sprintf('Failed to schedule sync event for %s at %s Sydney time', 
-                                $scheduled_time->format('Y-m-d'), 
-                                $time
-                            ),
-                            [
-                                'attempted_for' => $scheduled_time->format('Y-m-d H:i:s'), 
-                                'day' => $day_name, 
-                                'time' => $time
-                            ]
-                        );
-                    }
-                } else {
-                    WCOSPA_Logger::debug(
-                        sprintf('Skipping past event: %s at %s', $scheduled_time->format('Y-m-d'), $time),
-                        ['past_event' => $scheduled_time->format('Y-m-d H:i:s')]
-                    );
-                }
-            }
-        }
-        
-        WCOSPA_Logger::info(
-            sprintf('Completed scheduling sync events. Total scheduled: %d', $scheduled_count),
-            ['total_scheduled' => $scheduled_count, 'current_sydney_time' => $now->format('Y-m-d H:i:s')]
-        );
-        
-        // Verify scheduling worked
-        $next_scheduled = wp_next_scheduled(self::HOOK_NAME);
-        if ($next_scheduled) {
-            $next_event_time = new DateTime('@' . $next_scheduled);
-            $next_event_time->setTimezone($sydney_timezone);
-            
-            WCOSPA_Logger::info(
-                sprintf('Verification: Next scheduled event is %s Sydney time', $next_event_time->format('Y-m-d H:i:s')),
-                ['next_event_sydney' => $next_event_time->format('Y-m-d H:i:s')]
-            );
-        } else {
-            WCOSPA_Logger::error(
-                'Verification failed: No scheduled events found after scheduling attempt',
-                ['scheduled_count' => $scheduled_count]
-            );
-        }
-    }
-
-    /**
-     * Run the scheduled sync action
-     */
-    public static function run_scheduled_sync()
-    {
-        $sydney_timezone = new DateTimeZone('Australia/Sydney');
-        $now = new DateTime('now', $sydney_timezone);
-        
-        WCOSPA_Logger::info(
-            sprintf('Running scheduled sync at %s Sydney time', $now->format('Y-m-d H:i:s')),
-            ['scheduled_event' => true, 'sydney_time' => $now->format('Y-m-d H:i:s')]
-        );
-        
-        // Run the morning preparing to ship orders processing
-        WCOSPA_Order_Handler::process_morning_preparing_to_ship_orders();
-        
-        // Also process shipment tracking
-        WCOSPA_Shipment_Handler::process_pending_shipments();
-        
-        // Only reschedule if we don't have future events scheduled
-        $next_scheduled = wp_next_scheduled(self::HOOK_NAME);
-        if (!$next_scheduled) {
-            WCOSPA_Logger::warning(
-                'No future scheduled events found after sync completion. Rescheduling...',
-                ['action' => 'emergency_reschedule']
-            );
-            self::schedule_sync_events();
-        } else {
-            $next_event_time = new DateTime('@' . $next_scheduled);
-            $next_event_time->setTimezone($sydney_timezone);
-            WCOSPA_Logger::debug(
-                sprintf('Next scheduled event already exists: %s Sydney time', $next_event_time->format('Y-m-d H:i:s')),
-                ['next_event_sydney' => $next_event_time->format('Y-m-d H:i:s')]
-            );
-        }
-        
-        WCOSPA_Logger::info(
-            'Scheduled sync completed and next events scheduled',
-            ['scheduled_event' => true, 'sydney_time' => $now->format('Y-m-d H:i:s')]
-        );
-    }
-
-    /**
-     * Simple health check for scheduled events (only when manually triggered)
-     */
-    public static function health_check_scheduled_events()
-    {
-        $sydney_timezone = new DateTimeZone('Australia/Sydney');
-        $now = new DateTime('now', $sydney_timezone);
-        $next_scheduled = wp_next_scheduled(self::HOOK_NAME);
-        
-        if ($next_scheduled) {
-            $next_event_time = new DateTime('@' . $next_scheduled);
-            $next_event_time->setTimezone($sydney_timezone);
-            
-            WCOSPA_Logger::info(
-                sprintf('Health check: Next scheduled sync event is %s Sydney time', $next_event_time->format('Y-m-d H:i:s')),
-                [
-                    'next_event_sydney' => $next_event_time->format('Y-m-d H:i:s'),
-                    'current_sydney_time' => $now->format('Y-m-d H:i:s'),
-                    'time_until_next' => $next_scheduled - time() . ' seconds'
-                ]
-            );
-        } else {
-            WCOSPA_Logger::warning(
-                'Health check: No scheduled sync events found - rescheduling...',
-                ['current_sydney_time' => $now->format('Y-m-d H:i:s')]
-            );
-            self::schedule_sync_events();
-        }
-    }
-
-    /**
-     * Manually trigger a test of the scheduled sync system
-     */
-    public static function test_scheduled_sync()
-    {
-        WCOSPA_Logger::info(
-            'Manual test of scheduled sync system triggered',
-            ['test_trigger' => true]
-        );
-        
-        self::run_scheduled_sync();
-    }
-
-    /**
-     * Get detailed information about scheduled events for debugging
-     */
-    public static function get_scheduled_events_info()
-    {
-        $sydney_timezone = new DateTimeZone('Australia/Sydney');
-        $now = new DateTime('now', $sydney_timezone);
-        
-        // Get all cron events
-        $cron_events = wp_get_ready_cron_jobs();
-        $our_events = [];
-        
-        foreach ($cron_events as $timestamp => $events) {
-            if (isset($events[self::HOOK_NAME])) {
-                $event_time = new DateTime('@' . $timestamp);
-                $event_time->setTimezone($sydney_timezone);
-                $our_events[] = [
-                    'timestamp' => $timestamp,
-                    'sydney_time' => $event_time->format('Y-m-d H:i:s'),
-                    'seconds_from_now' => $timestamp - time()
-                ];
-            }
-        }
-        
-        WCOSPA_Logger::info(
-            sprintf('Found %d scheduled events for %s', count($our_events), self::HOOK_NAME),
-            [
-                'hook_name' => self::HOOK_NAME,
-                'events_count' => count($our_events),
-                'events' => $our_events,
-                'current_sydney_time' => $now->format('Y-m-d H:i:s')
-            ]
-        );
-        
-        return $our_events;
-    }
-
-    /**
-     * Check server cron configuration and provide guidance
-     */
-    public static function check_server_cron_configuration()
-    {
-        $site_url = get_site_url();
-        $wp_cron_url = $site_url . '/wp-cron.php';
-        
-        WCOSPA_Logger::info(
-            'Server cron configuration check',
-            [
-                'site_url' => $site_url,
-                'wp_cron_url' => $wp_cron_url,
-                'wp_cron_disabled' => defined('DISABLE_WP_CRON') && DISABLE_WP_CRON,
-                'recommended_cron_command' => "*/5 * * * * wget -q -O /dev/null '$wp_cron_url' >/dev/null 2>&1"
-            ]
-        );
-        
-        // Check if wp-cron.php is accessible
-        $response = wp_remote_get($wp_cron_url, [
-            'timeout' => 5,
-            'user-agent' => 'WCOSPA-Cron-Check/1.0'
-        ]);
-        
-        if (is_wp_error($response)) {
-            WCOSPA_Logger::warning(
-                'wp-cron.php is not accessible - server cron may not be configured correctly',
-                [
-                    'error' => $response->get_error_message(),
-                    'wp_cron_url' => $wp_cron_url
-                ]
-            );
-        } else {
-            $status_code = wp_remote_retrieve_response_code($response);
-            WCOSPA_Logger::info(
-                sprintf('wp-cron.php is accessible (HTTP %d)', $status_code),
-                ['status_code' => $status_code, 'wp_cron_url' => $wp_cron_url]
-            );
-        }
-    }
-
-    /**
-     * Clear all scheduled sync events (useful for deactivation)
-     */
-    public static function clear_scheduled_events()
-    {
-        wp_clear_scheduled_hook(self::HOOK_NAME);
-        
-        WCOSPA_Logger::debug(
-            'All scheduled sync events cleared',
-            ['action' => 'clear_scheduled_events']
-        );
-    }
-}
-
-WCOSPA_Scheduled_Sync_Handler::init();
 
 class WCOSPA_Order_Data_Formatter
 {
@@ -1549,7 +1050,7 @@ class WCOSPA_Order_Data_Formatter
         foreach ($items as $item_id => $item) {
             $product = $item->get_product();
             if (!$product || !$product->get_sku()) {
-                WCOSPA_Logger::error('Product or SKU not found for item ID: ' . $item_id, ['item_id' => $item_id]);
+                error_log('Product or SKU not found for item ID: ' . $item_id);
                 continue;
             }
 

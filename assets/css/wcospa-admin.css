@@ -72,13 +72,11 @@
    3. Bulk Sync Button Styles
    ========================================================================== */
 
-#wcospa-bulk-sync-processing,
-#wcospa-bulk-get-shipping {
+#wcospa-bulk-sync-processing {
     margin-right: 8px;
 }
 
-#wcospa-bulk-sync-processing.loading,
-#wcospa-bulk-get-shipping.loading {
+#wcospa-bulk-sync-processing.loading {
     opacity: 0.7;
     cursor: not-allowed;
 }

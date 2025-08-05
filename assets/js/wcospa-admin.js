@@ -267,13 +267,6 @@ document.addEventListener("DOMContentLoaded", function () {
             bulkSyncButton.removeEventListener('click', handleBulkSyncClick);
             bulkSyncButton.addEventListener('click', handleBulkSyncClick);
         }
-
-        // Bind Bulk Get Shipping Numbers button
-        const bulkShippingButton = document.getElementById('wcospa-bulk-get-shipping');
-        if (bulkShippingButton) {
-            bulkShippingButton.removeEventListener('click', handleBulkShippingClick);
-            bulkShippingButton.addEventListener('click', handleBulkShippingClick);
-        }
     }
 
     // Initial binding
@@ -428,35 +421,6 @@ document.addEventListener("DOMContentLoaded", function () {
         url.searchParams.set('nonce', nonce);
 
         // Navigate to the URL to trigger the bulk sync
-        window.location.href = url.toString();
-    }
-
-    // Define the click handler for Bulk Get Shipping Numbers button
-    function handleBulkShippingClick(e) {
-        e.preventDefault();
-        const button = this;
-        const nonce = button.getAttribute('data-nonce');
-
-        // Confirm the bulk action
-        const confirmMessage = 'Are you sure you want to obtain shipping numbers for all "Preparing to Ship" orders? This may take several minutes as orders are processed sequentially.';
-        if (!confirm(confirmMessage)) {
-            return;
-        }
-
-        console.log('Bulk Get Shipping Numbers clicked'); // Debug log
-
-        // Add loading state
-        button.classList.add('loading');
-        button.disabled = true;
-        const originalText = button.textContent;
-        button.textContent = 'Processing orders sequentially...';
-
-        // Construct the URL with parameters
-        const url = new URL(window.location.href);
-        url.searchParams.set('wcospa_bulk_shipping', '1');
-        url.searchParams.set('nonce', nonce);
-
-        // Navigate to the URL to trigger the bulk shipping
         window.location.href = url.toString();
     }
 });
