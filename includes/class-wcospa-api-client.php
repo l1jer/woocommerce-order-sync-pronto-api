@@ -43,8 +43,8 @@ class WCOSPA_API_Client
             $order_data = WCOSPA_Order_Data_Formatter::format_order($order, $customer_reference);
 
             // Log the sync URL and order data for debugging
-            self::log(sprintf('Sync URL: %s', $api_url));
-            self::log(sprintf('Order Data: %s', print_r($order_data, true)));
+            WCOSPA_Logger::debug(sprintf('Sync URL: %s', $api_url));
+            WCOSPA_Logger::debug(sprintf('Order Data: %s', wp_json_encode($order_data)));
 
             // Make the POST request to the API to sync the order with timeout handling
             $response = wp_remote_post($api_url, [
@@ -64,23 +64,23 @@ class WCOSPA_API_Client
                 
                 // Check for 524 timeout or other timeout indicators
                 if (self::is_timeout_error($response, $error_message)) {
-                    self::log(sprintf('[TIMEOUT ERROR] Sync API request timed out for order %d: %s', $order_id, $error_message));
+                    WCOSPA_Logger::error(sprintf('Sync API request timed out for order %d: %s', $order_id, $error_message));
                     return new WP_Error('api_timeout', sprintf('API request timed out after 110 seconds for order %d. This indicates a server-side timeout (likely 524 error).', $order_id));
                 }
                 
-                self::log(sprintf('Sync API request failed: %s', $error_message));
+                WCOSPA_Logger::error(sprintf('Sync API request failed: %s', $error_message));
                 return $response;
             }
 
             // Check HTTP response code for 524 or other timeout-related codes
             $response_code = wp_remote_retrieve_response_code($response);
             if ($response_code === 524) {
-                self::log(sprintf('[524 TIMEOUT ERROR] Server timeout detected for order %d sync request', $order_id));
+                WCOSPA_Logger::error(sprintf('Server timeout (524) detected for order %d sync request', $order_id));
                 return new WP_Error('server_timeout_524', sprintf('Server returned 524 timeout error for order %d. Request exceeded server timeout limit.', $order_id));
             }
             
             if (in_array($response_code, [502, 503, 504, 522, 523])) {
-                self::log(sprintf('[SERVER ERROR] Server error %d detected for order %d sync request', $response_code, $order_id));
+                WCOSPA_Logger::error(sprintf('Server error %d detected for order %d sync request', $response_code, $order_id));
                 return new WP_Error('server_error', sprintf('Server returned error code %d for order %d. Please try again later.', $response_code, $order_id));
             }
 
@@ -324,12 +324,12 @@ class WCOSPA_API_Client
         return $order_details;
     }
 
+    /**
+     * @deprecated Use WCOSPA_Logger methods instead
+     */
     public static function log($message)
     {
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            // Write the log message to the WordPress debug log
-            error_log('[WCOSPA] ' . $message);
-        }
+        WCOSPA_Logger::debug($message);
     }
 
     /**

@@ -110,6 +110,19 @@ This plugin is licensed under the GPLv2 or later. For more information, see http
 
 ### Changelog
 
+#### 1.6.5
+- **Feature:** Implemented dedicated plugin logging system with performance optimization
+  - Created lightweight `WCOSPA_Logger` class with minimal CPU and memory usage
+  - Dedicated log files in plugin directory (`wp-content/plugins/woocommerce-order-sync-pronto-api/logs/`)
+  - Automatic log rotation when files exceed 10MB with optional compression
+  - 7-day automatic log retention with scheduled cleanup
+  - Buffered logging system (batch writes) to minimize file I/O operations
+  - Security features: .htaccess protection, directory indexing prevention
+  - Log level support: DEBUG, INFO, WARNING, ERROR, CRITICAL
+  - Performance optimizations: periodic cleanup checks, async scheduling, minimal overhead
+  - Admin interface integration showing log statistics and file information
+  - Updated all existing logging calls throughout codebase to use new system
+
 #### 1.6.4
 - **Feature:** Added manual "Obtain Shipping Number" button for bulk shipment number retrieval
   - Button appears next to Filter button on WooCommerce Orders admin page

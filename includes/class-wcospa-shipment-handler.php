@@ -147,13 +147,12 @@ class WCOSPA_Shipment_Handler
             
             // Handle timeout errors specifically
             if (in_array($error_code, ['api_timeout', 'server_timeout_524'])) {
-                wc_get_logger()->error(
-                    sprintf('[TIMEOUT ERROR] Shipment number fetch failed due to timeout for order %d via %s: %s', 
+                WCOSPA_Logger::error(
+                    sprintf('Shipment number fetch failed due to timeout for order %d via %s: %s', 
                         $order_id,
                         strtoupper($context),
                         $error_message
-                    ),
-                    ['source' => 'wcospa']
+                    )
                 );
                 
                 // Mark this order as having a timeout issue for tracking
@@ -170,13 +169,12 @@ class WCOSPA_Shipment_Handler
             
             // Handle other server errors
             if ($error_code === 'server_error') {
-                wc_get_logger()->error(
-                    sprintf('[SERVER ERROR] Shipment number fetch failed due to server error for order %d via %s: %s', 
+                WCOSPA_Logger::error(
+                    sprintf('Shipment number fetch failed due to server error for order %d via %s: %s', 
                         $order_id,
                         strtoupper($context),
                         $error_message
-                    ),
-                    ['source' => 'wcospa']
+                    )
                 );
                 
                 return [

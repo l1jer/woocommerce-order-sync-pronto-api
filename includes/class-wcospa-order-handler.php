@@ -100,10 +100,7 @@ class WCOSPA_Order_Handler
         $response = WCOSPA_API_Client::sync_order($order_id);
 
         if (is_wp_error($response)) {
-            wc_get_logger()->error(
-                sprintf('Order sync failed: %s', $response->get_error_message()),
-                ['source' => 'wcospa']
-            );
+            WCOSPA_Logger::error(sprintf('Order sync failed: %s', $response->get_error_message()));
         } else {
             $order = wc_get_order($order_id);
             $order->update_status('wc-preparing-to-ship', 'Order marked as Preparing to Ship after successful API sync.');
@@ -1224,28 +1221,26 @@ class WCOSPA_Bulk_Shipment_Handler
                     $status = 'timeout';
                     $message = 'Request timed out (524 error)';
                     
-                    // Log timeout error specifically
-                    wc_get_logger()->error(
-                        sprintf('[BULK TIMEOUT] Order %d shipment fetch timed out: %s (%.2fms)', 
-                            $order_id,
-                            $result['message'],
-                            $processing_time
-                        ),
-                        ['source' => 'wcospa']
-                    );
+                                         // Log timeout error specifically
+                     WCOSPA_Logger::error(
+                         sprintf('BULK TIMEOUT: Order %d shipment fetch timed out: %s (%.2fms)', 
+                             $order_id,
+                             $result['message'],
+                             $processing_time
+                         )
+                     );
                 } elseif ($result['error_type'] === 'server_error') {
                     $status = 'server_error';
                     $message = 'Server error occurred';
                     
-                    // Log server error specifically
-                    wc_get_logger()->error(
-                        sprintf('[BULK SERVER ERROR] Order %d shipment fetch server error: %s (%.2fms)', 
-                            $order_id,
-                            $result['message'],
-                            $processing_time
-                        ),
-                        ['source' => 'wcospa']
-                    );
+                                         // Log server error specifically
+                     WCOSPA_Logger::error(
+                         sprintf('BULK SERVER ERROR: Order %d shipment fetch server error: %s (%.2fms)', 
+                             $order_id,
+                             $result['message'],
+                             $processing_time
+                         )
+                     );
                 }
             }
             

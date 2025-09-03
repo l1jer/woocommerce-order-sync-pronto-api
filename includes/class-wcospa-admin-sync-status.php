@@ -105,6 +105,22 @@ class WCOSPA_Admin_Sync_Status
             </div>
             
             <div class="wcospa-settings-section">
+                <h2><?php _e('Plugin Logs', 'wcospa'); ?></h2>
+                <?php 
+                $log_stats = WCOSPA_Logger::get_log_stats();
+                ?>
+                <div class="wcospa-log-stats">
+                    <p><strong><?php _e('Log Statistics:', 'wcospa'); ?></strong></p>
+                    <ul>
+                        <li><?php _e('Total log files:', 'wcospa'); ?> <?php echo esc_html($log_stats['total_files']); ?></li>
+                        <li><?php _e('Total size:', 'wcospa'); ?> <?php echo esc_html(size_format($log_stats['total_size'])); ?></li>
+                        <li><?php _e('Retention period:', 'wcospa'); ?> 7 days</li>
+                        <li><?php _e('Log location:', 'wcospa'); ?> <code>plugins/woocommerce-order-sync-pronto-api/logs/</code></li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="wcospa-settings-section">
                 <h2><?php _e('Maintenance', 'wcospa'); ?></h2>
                 <button id="wcospa-clear-all-sync-data" class="button button-large"><?php _e('Clear All Sync Data', 'wcospa'); ?></button>
                 <p><?php _e('Click "Clear All Sync Data" to reset sync statuses for all orders.', 'wcospa'); ?></p>
