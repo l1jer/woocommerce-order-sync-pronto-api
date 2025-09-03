@@ -46,7 +46,7 @@ class WCOSPA_API_Client
             self::log(sprintf('Sync URL: %s', $api_url));
             self::log(sprintf('Order Data: %s', print_r($order_data, true)));
 
-            // Make the POST request to the API to sync the order
+            // Make the POST request to the API to sync the order with timeout handling
             $response = wp_remote_post($api_url, [
                 'headers' => [
                     'Authorization' => sprintf('Basic %s', 
@@ -55,12 +55,33 @@ class WCOSPA_API_Client
                     'Content-Type' => 'application/json',
                 ],
                 'body' => function_exists('wp_json_encode') ? wp_json_encode($order_data) : json_encode($order_data),
-                'timeout' => 20,
+                'timeout' => 110, // Set to 110 seconds to avoid SiteGround 120s limit
             ]);
 
+            // Check for 524 timeout error or other timeout-related issues
             if (is_wp_error($response)) {
-                self::log(sprintf('Sync API request failed: %s', $response->get_error_message()));
+                $error_message = $response->get_error_message();
+                
+                // Check for 524 timeout or other timeout indicators
+                if (self::is_timeout_error($response, $error_message)) {
+                    self::log(sprintf('[TIMEOUT ERROR] Sync API request timed out for order %d: %s', $order_id, $error_message));
+                    return new WP_Error('api_timeout', sprintf('API request timed out after 110 seconds for order %d. This indicates a server-side timeout (likely 524 error).', $order_id));
+                }
+                
+                self::log(sprintf('Sync API request failed: %s', $error_message));
                 return $response;
+            }
+
+            // Check HTTP response code for 524 or other timeout-related codes
+            $response_code = wp_remote_retrieve_response_code($response);
+            if ($response_code === 524) {
+                self::log(sprintf('[524 TIMEOUT ERROR] Server timeout detected for order %d sync request', $order_id));
+                return new WP_Error('server_timeout_524', sprintf('Server returned 524 timeout error for order %d. Request exceeded server timeout limit.', $order_id));
+            }
+            
+            if (in_array($response_code, [502, 503, 504, 522, 523])) {
+                self::log(sprintf('[SERVER ERROR] Server error %d detected for order %d sync request', $response_code, $order_id));
+                return new WP_Error('server_error', sprintf('Server returned error code %d for order %d. Please try again later.', $response_code, $order_id));
             }
 
             // Check if the response body is empty
@@ -158,17 +179,37 @@ class WCOSPA_API_Client
             // Log the transaction URL for debugging
             self::log(sprintf('Transaction URL: %s', $transaction_url));
 
-            // Make the GET request to the API
+            // Make the GET request to the API with timeout handling
             $response = wp_remote_get($transaction_url, [
                 'headers' => [
                     'Authorization' => 'Basic ' . base64_encode($credentials['username'] . ':' . $credentials['password']),
                 ],
-                'timeout' => 20,
+                'timeout' => 110, // Set to 110 seconds to avoid SiteGround 120s limit
             ]);
 
             if (is_wp_error($response)) {
-                self::log('Fetch API request failed: ' . $response->get_error_message());
+                $error_message = $response->get_error_message();
+                
+                // Check for 524 timeout or other timeout indicators
+                if (self::is_timeout_error($response, $error_message)) {
+                    self::log(sprintf('[TIMEOUT ERROR] Fetch API request timed out for order %d: %s', $order_id, $error_message));
+                    return new WP_Error('api_timeout', sprintf('API request timed out after 110 seconds for order %d. This indicates a server-side timeout (likely 524 error).', $order_id));
+                }
+                
+                self::log('Fetch API request failed: ' . $error_message);
                 return $response;
+            }
+
+            // Check HTTP response code for 524 or other timeout-related codes
+            $response_code = wp_remote_retrieve_response_code($response);
+            if ($response_code === 524) {
+                self::log(sprintf('[524 TIMEOUT ERROR] Server timeout detected for order %d fetch request', $order_id));
+                return new WP_Error('server_timeout_524', sprintf('Server returned 524 timeout error for order %d. Request exceeded server timeout limit.', $order_id));
+            }
+            
+            if (in_array($response_code, [502, 503, 504, 522, 523])) {
+                self::log(sprintf('[SERVER ERROR] Server error %d detected for order %d fetch request', $response_code, $order_id));
+                return new WP_Error('server_error', sprintf('Server returned error code %d for order %d. Please try again later.', $response_code, $order_id));
             }
 
             // Get the response body
@@ -231,17 +272,37 @@ class WCOSPA_API_Client
         // Log the order URL for debugging
         self::log('Order URL: ' . $order_url);
 
-        // Make the GET request to the API
+        // Make the GET request to the API with timeout handling
         $response = wp_remote_get($order_url, [
             'headers' => [
                 'Authorization' => 'Basic ' . base64_encode($credentials['username'] . ':' . $credentials['password']),
             ],
-            'timeout' => 20,
+            'timeout' => 110, // Set to 110 seconds to avoid SiteGround 120s limit
         ]);
 
         if (is_wp_error($response)) {
-            self::log('Pronto Order API request failed: ' . $response->get_error_message());
+            $error_message = $response->get_error_message();
+            
+            // Check for 524 timeout or other timeout indicators
+            if (self::is_timeout_error($response, $error_message)) {
+                self::log(sprintf('[TIMEOUT ERROR] Pronto Order API request timed out for order %d: %s', $order_id, $error_message));
+                return new WP_Error('api_timeout', sprintf('API request timed out after 110 seconds for order %d. This indicates a server-side timeout (likely 524 error).', $order_id));
+            }
+            
+            self::log('Pronto Order API request failed: ' . $error_message);
             return $response;
+        }
+
+        // Check HTTP response code for 524 or other timeout-related codes
+        $response_code = wp_remote_retrieve_response_code($response);
+        if ($response_code === 524) {
+            self::log(sprintf('[524 TIMEOUT ERROR] Server timeout detected for order %d Pronto Order details request', $order_id));
+            return new WP_Error('server_timeout_524', sprintf('Server returned 524 timeout error for order %d. Request exceeded server timeout limit.', $order_id));
+        }
+        
+        if (in_array($response_code, [502, 503, 504, 522, 523])) {
+            self::log(sprintf('[SERVER ERROR] Server error %d detected for order %d Pronto Order details request', $response_code, $order_id));
+            return new WP_Error('server_error', sprintf('Server returned error code %d for order %d. Please try again later.', $response_code, $order_id));
         }
 
         $body = json_decode(wp_remote_retrieve_body($response), true);
@@ -271,6 +332,46 @@ class WCOSPA_API_Client
         }
     }
 
+    /**
+     * Check if a WP_Error or error message indicates a timeout
+     * 
+     * @param WP_Error $response The response object
+     * @param string $error_message The error message
+     * @return bool True if this is a timeout error
+     */
+    private static function is_timeout_error($response, $error_message)
+    {
+        // Check for common timeout error messages
+        $timeout_indicators = [
+            'timeout',
+            'timed out',
+            'connection timeout',
+            'operation timed out',
+            '524',
+            'gateway timeout',
+            'request timeout'
+        ];
+        
+        $error_lower = strtolower($error_message);
+        foreach ($timeout_indicators as $indicator) {
+            if (strpos($error_lower, $indicator) !== false) {
+                return true;
+            }
+        }
+        
+        // Check WP_Error codes
+        if (is_wp_error($response)) {
+            $error_codes = $response->get_error_codes();
+            foreach ($error_codes as $code) {
+                if (in_array($code, ['http_request_timeout', 'timeout', 'connection_timeout'])) {
+                    return true;
+                }
+            }
+        }
+        
+        return false;
+    }
+
     private static function handle_order_error($order, $order_id)
     {
         if (!$order) {
@@ -287,13 +388,36 @@ class WCOSPA_API_Client
                 'Authorization' => 'Basic ' . base64_encode($credentials['username'] . ':' . $credentials['password']),
                 'Content-Type' => 'application/json',
             ],
-            'timeout' => 20,
+            'timeout' => 110, // Set to 110 seconds to avoid SiteGround 120s limit
         ];
 
         if ($body) {
             $args['body'] = json_encode($body);
         }
 
-        return $method === 'GET' ? wp_remote_get($url, $args) : wp_remote_post($url, $args);
+        $response = $method === 'GET' ? wp_remote_get($url, $args) : wp_remote_post($url, $args);
+        
+        // Check for timeout errors
+        if (is_wp_error($response)) {
+            $error_message = $response->get_error_message();
+            if (self::is_timeout_error($response, $error_message)) {
+                self::log(sprintf('[TIMEOUT ERROR] API request timed out for URL %s: %s', $url, $error_message));
+                return new WP_Error('api_timeout', sprintf('API request timed out after 110 seconds. This indicates a server-side timeout (likely 524 error).'));
+            }
+        } else {
+            // Check HTTP response code for 524 or other timeout-related codes
+            $response_code = wp_remote_retrieve_response_code($response);
+            if ($response_code === 524) {
+                self::log(sprintf('[524 TIMEOUT ERROR] Server timeout detected for URL %s', $url));
+                return new WP_Error('server_timeout_524', 'Server returned 524 timeout error. Request exceeded server timeout limit.');
+            }
+            
+            if (in_array($response_code, [502, 503, 504, 522, 523])) {
+                self::log(sprintf('[SERVER ERROR] Server error %d detected for URL %s', $response_code, $url));
+                return new WP_Error('server_error', sprintf('Server returned error code %d. Please try again later.', $response_code));
+            }
+        }
+        
+        return $response;
     }
 }

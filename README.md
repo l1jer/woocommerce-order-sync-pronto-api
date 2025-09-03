@@ -110,6 +110,33 @@ This plugin is licensed under the GPLv2 or later. For more information, see http
 
 ### Changelog
 
+#### 1.6.4
+- **Feature:** Added manual "Obtain Shipping Number" button for bulk shipment number retrieval
+  - Button appears next to Filter button on WooCommerce Orders admin page
+  - Only shows when eligible orders exist (orders in "Preparing to Ship" status without shipment numbers)
+  - Displays count of orders to be processed
+  - Implements chunked processing system (2 orders per batch) to avoid SiteGround 120-second timeout
+  - Uses existing `WCOSPA_Shipment_Handler::fetch_shipment_number()` function
+  - Provides real-time progress tracking with individual order results
+  - Respects API rate limits with 1-second delays between batches and 200ms delays between individual requests
+  - Beautiful modal interface with progress bar and results display
+
+- **Critical Fix:** Implemented robust 524 timeout error detection and handling for SiteGround's 120-second timeout limit
+  - Added comprehensive timeout error detection in all API client methods (`sync_order`, `fetch_order_status`, `get_pronto_order_details`)
+  - Updated HTTP request timeout from 20 seconds to 110 seconds to avoid SiteGround's 120-second limit
+  - Implemented specific error handling for 524 timeout errors, server errors (502, 503, 504, 522, 523), and other timeout indicators
+  - Enhanced `fetch_shipment_number` function with detailed timeout error handling and logging
+  - Updated AJAX handlers to provide specific user feedback for timeout and server errors
+  - Enhanced bulk shipment processing with timeout-aware error handling and status tracking
+  - Added visual indicators in the admin interface for timeout errors (orange) and server errors (red)
+  - Implemented comprehensive logging with `[TIMEOUT ERROR]`, `[524 TIMEOUT ERROR]`, and `[SERVER ERROR]` prefixes for easy identification
+  - Added timeout error tracking in order meta data for debugging purposes
+  - Updated JavaScript frontend to display timeout and server error statuses with appropriate styling
+  - Added informational notices about timeout behavior in the admin interface
+  - All timeout errors now prevent further processing and provide clear error messages to administrators
+
+- **Enhancement:** Comprehensive error handling, detailed logging, and improved user feedback throughout the system
+
 #### 1.6.3b
 - **Enhancement:** Updated shipment tracking schedule with new business hours
   - **Monday-Thursday**: 8:00 AM, 9:00 AM, 10:00 AM, 11:00 AM, 1:00 PM, 5:00 PM (Sydney time)

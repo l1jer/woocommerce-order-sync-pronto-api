@@ -434,8 +434,23 @@ class WCOSPA_Order_Sync_Button
                 
                 wp_send_json_success(['shipment_number' => $result['shipment_number']]);
             } else {
-                wc_get_logger()->debug($result['message'], ['source' => 'wcospa']);
-                wp_send_json_error($result['message']);
+                // Check for timeout errors and provide specific error handling
+                if (isset($result['error_type']) && $result['error_type'] === 'timeout') {
+                    wc_get_logger()->error(
+                        sprintf('AJAX shipment fetch timeout for order %d: %s', $order_id, $result['message']), 
+                        ['source' => 'wcospa']
+                    );
+                    wp_send_json_error('Request timed out (524 error). The server took too long to respond. Please try again later.');
+                } elseif (isset($result['error_type']) && $result['error_type'] === 'server_error') {
+                    wc_get_logger()->error(
+                        sprintf('AJAX shipment fetch server error for order %d: %s', $order_id, $result['message']), 
+                        ['source' => 'wcospa']
+                    );
+                    wp_send_json_error('Server error occurred. Please try again later.');
+                } else {
+                    wc_get_logger()->debug($result['message'], ['source' => 'wcospa']);
+                    wp_send_json_error($result['message']);
+                }
             }
         } finally {
             // Always remove the lock
@@ -1076,3 +1091,234 @@ function register_three_second_interval($schedules)
     return $schedules;
 }
 add_filter('cron_schedules', 'register_three_second_interval');
+
+class WCOSPA_Bulk_Shipment_Handler
+{
+    const CHUNK_SIZE = 2; // Process 2 orders per batch
+    const BATCH_DELAY = 1; // 1 second delay between batches
+    
+    public static function init()
+    {
+        add_action('manage_posts_extra_tablenav', [__CLASS__, 'add_bulk_shipment_button']);
+        add_action('wp_ajax_wcospa_bulk_shipment', [__CLASS__, 'handle_bulk_shipment_request']);
+        add_action('admin_enqueue_scripts', [__CLASS__, 'enqueue_scripts']);
+    }
+
+    /**
+     * Add bulk shipment button to orders page
+     */
+    public static function add_bulk_shipment_button($which)
+    {
+        global $current_screen;
+        
+        // Only show on shop_order post type and on the top tablenav
+        if ($current_screen->post_type !== 'shop_order' || $which !== 'top') {
+            return;
+        }
+
+        // Check if there are eligible orders
+        $eligible_count = self::get_eligible_orders_count();
+        
+        if ($eligible_count > 0) {
+            echo '<div class="alignleft actions">';
+            echo '<button type="button" id="wcospa-bulk-shipment" class="button" data-nonce="' . wp_create_nonce('wcospa_bulk_shipment_nonce') . '">';
+            echo sprintf(__('Obtain Shipping Number (%d orders)', 'wcospa'), $eligible_count);
+            echo '</button>';
+            echo '</div>';
+        }
+    }
+
+    /**
+     * Get count of eligible orders for shipment number retrieval
+     */
+    public static function get_eligible_orders_count()
+    {
+        global $wpdb;
+        
+        $count = $wpdb->get_var("
+            SELECT COUNT(DISTINCT o.ID)
+            FROM {$wpdb->posts} o
+            JOIN {$wpdb->postmeta} pm1 ON o.ID = pm1.post_id 
+            LEFT JOIN {$wpdb->postmeta} pm2 ON o.ID = pm2.post_id AND pm2.meta_key = '_wcospa_shipment_number'
+            WHERE o.post_type = 'shop_order'
+            AND o.post_status = 'wc-preparing-to-ship'
+            AND pm1.meta_key = '_wcospa_pronto_order_number'
+            AND (pm2.meta_value IS NULL OR pm2.meta_value = '')
+        ");
+        
+        return (int) $count;
+    }
+
+    /**
+     * Get eligible orders for shipment number retrieval
+     */
+    public static function get_eligible_orders($limit = null)
+    {
+        global $wpdb;
+        
+        $limit_clause = $limit ? "LIMIT {$limit}" : '';
+        
+        $orders = $wpdb->get_results("
+            SELECT DISTINCT o.ID as order_id, pm1.meta_value as pronto_order_number
+            FROM {$wpdb->posts} o
+            JOIN {$wpdb->postmeta} pm1 ON o.ID = pm1.post_id 
+            LEFT JOIN {$wpdb->postmeta} pm2 ON o.ID = pm2.post_id AND pm2.meta_key = '_wcospa_shipment_number'
+            WHERE o.post_type = 'shop_order'
+            AND o.post_status = 'wc-preparing-to-ship'
+            AND pm1.meta_key = '_wcospa_pronto_order_number'
+            AND (pm2.meta_value IS NULL OR pm2.meta_value = '')
+            ORDER BY o.ID ASC
+            {$limit_clause}
+        ");
+        
+        return $orders;
+    }
+
+    /**
+     * Handle bulk shipment AJAX request
+     */
+    public static function handle_bulk_shipment_request()
+    {
+        check_ajax_referer('wcospa_bulk_shipment_nonce', 'nonce');
+
+        if (!current_user_can('manage_woocommerce')) {
+            wp_send_json_error('Insufficient permissions');
+        }
+
+        $chunk = isset($_POST['chunk']) ? (int) $_POST['chunk'] : 0;
+        $offset = $chunk * self::CHUNK_SIZE;
+        
+        // Get eligible orders for this chunk
+        $eligible_orders = self::get_eligible_orders(self::CHUNK_SIZE . " OFFSET {$offset}");
+        
+        if (empty($eligible_orders)) {
+            wp_send_json_success([
+                'status' => 'complete',
+                'message' => 'No more orders to process'
+            ]);
+        }
+
+        $results = [];
+        $start_time = microtime(true);
+
+        // Process each order in the chunk
+        foreach ($eligible_orders as $order_data) {
+            $order_id = (int) $order_data->order_id;
+            $pronto_order_number = $order_data->pronto_order_number;
+            
+            $order_start_time = microtime(true);
+            
+            // Use existing shipment handler function
+            $result = WCOSPA_Shipment_Handler::fetch_shipment_number($order_id, 'bulk');
+            
+            $processing_time = round((microtime(true) - $order_start_time) * 1000, 2); // milliseconds
+            
+            // Handle timeout errors specifically
+            $status = 'error';
+            $message = $result['message'] ?? 'Processed successfully';
+            
+            if ($result['success']) {
+                $status = 'success';
+            } elseif (isset($result['error_type'])) {
+                if ($result['error_type'] === 'timeout') {
+                    $status = 'timeout';
+                    $message = 'Request timed out (524 error)';
+                    
+                    // Log timeout error specifically
+                    wc_get_logger()->error(
+                        sprintf('[BULK TIMEOUT] Order %d shipment fetch timed out: %s (%.2fms)', 
+                            $order_id,
+                            $result['message'],
+                            $processing_time
+                        ),
+                        ['source' => 'wcospa']
+                    );
+                } elseif ($result['error_type'] === 'server_error') {
+                    $status = 'server_error';
+                    $message = 'Server error occurred';
+                    
+                    // Log server error specifically
+                    wc_get_logger()->error(
+                        sprintf('[BULK SERVER ERROR] Order %d shipment fetch server error: %s (%.2fms)', 
+                            $order_id,
+                            $result['message'],
+                            $processing_time
+                        ),
+                        ['source' => 'wcospa']
+                    );
+                }
+            }
+            
+            $results[] = [
+                'order_id' => $order_id,
+                'pronto_order_number' => $pronto_order_number,
+                'status' => $status,
+                'shipment_number' => $result['shipment_number'] ?? null,
+                'message' => $message,
+                'processing_time' => $processing_time,
+                'status_code' => $result['status_code'] ?? null,
+                'error_type' => $result['error_type'] ?? null,
+                'error_code' => $result['error_code'] ?? null
+            ];
+
+            // Log the result
+            wc_get_logger()->info(
+                sprintf('Bulk shipment processing: Order %d - %s - %s (%.2fms)', 
+                    $order_id,
+                    strtoupper($status),
+                    $message,
+                    $processing_time
+                ),
+                ['source' => 'wcospa']
+            );
+            
+            // Add a small delay between requests to respect API rate limits and reduce server load
+            if (count($results) < count($eligible_orders)) {
+                usleep(200000); // 200ms delay between requests
+            }
+        }
+
+        $total_processing_time = round((microtime(true) - $start_time) * 1000, 2); // milliseconds
+        
+        // Check if there are more orders to process
+        $total_eligible = self::get_eligible_orders_count();
+        $processed_so_far = ($chunk + 1) * self::CHUNK_SIZE;
+        $has_more = $processed_so_far < $total_eligible;
+
+        wp_send_json_success([
+            'status' => $has_more ? 'chunk_complete' : 'complete',
+            'chunk' => $chunk,
+            'results' => $results,
+            'processed_so_far' => $processed_so_far,
+            'total_eligible' => $total_eligible,
+            'chunk_processing_time' => $total_processing_time,
+            'has_more' => $has_more,
+            'next_chunk' => $has_more ? $chunk + 1 : null
+        ]);
+    }
+
+    /**
+     * Enqueue scripts for bulk shipment functionality
+     */
+    public static function enqueue_scripts($hook)
+    {
+        if ($hook !== 'edit.php' || !isset($_GET['post_type']) || $_GET['post_type'] !== 'shop_order') {
+            return;
+        }
+
+        wp_enqueue_script('wcospa-bulk-shipment', WCOSPA_URL . 'assets/js/wcospa-bulk-shipment.js', ['jquery'], WCOSPA_VERSION, true);
+        wp_localize_script('wcospa-bulk-shipment', 'wcospaBulkShipment', [
+            'ajaxurl' => admin_url('admin-ajax.php'),
+            'nonce' => wp_create_nonce('wcospa_bulk_shipment_nonce'),
+            'strings' => [
+                'processing' => __('Processing orders...', 'wcospa'),
+                'complete' => __('All orders processed!', 'wcospa'),
+                'error' => __('An error occurred', 'wcospa'),
+                'success' => __('Success', 'wcospa'),
+                'failed' => __('Failed', 'wcospa')
+            ]
+        ]);
+    }
+}
+
+WCOSPA_Bulk_Shipment_Handler::init();

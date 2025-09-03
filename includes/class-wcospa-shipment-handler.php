@@ -140,6 +140,64 @@ class WCOSPA_Shipment_Handler
     {
         $order_details = WCOSPA_API_Client::get_pronto_order_details($order_id);
         
+        // Check for timeout errors first
+        if (is_wp_error($order_details)) {
+            $error_code = $order_details->get_error_code();
+            $error_message = $order_details->get_error_message();
+            
+            // Handle timeout errors specifically
+            if (in_array($error_code, ['api_timeout', 'server_timeout_524'])) {
+                wc_get_logger()->error(
+                    sprintf('[TIMEOUT ERROR] Shipment number fetch failed due to timeout for order %d via %s: %s', 
+                        $order_id,
+                        strtoupper($context),
+                        $error_message
+                    ),
+                    ['source' => 'wcospa']
+                );
+                
+                // Mark this order as having a timeout issue for tracking
+                update_post_meta($order_id, '_wcospa_shipment_timeout_error', time());
+                
+                return [
+                    'success' => false,
+                    'message' => sprintf('Timeout error (524): %s', $error_message),
+                    'context' => $context,
+                    'error_type' => 'timeout',
+                    'error_code' => $error_code
+                ];
+            }
+            
+            // Handle other server errors
+            if ($error_code === 'server_error') {
+                wc_get_logger()->error(
+                    sprintf('[SERVER ERROR] Shipment number fetch failed due to server error for order %d via %s: %s', 
+                        $order_id,
+                        strtoupper($context),
+                        $error_message
+                    ),
+                    ['source' => 'wcospa']
+                );
+                
+                return [
+                    'success' => false,
+                    'message' => sprintf('Server error: %s', $error_message),
+                    'context' => $context,
+                    'error_type' => 'server_error',
+                    'error_code' => $error_code
+                ];
+            }
+            
+            // Handle other errors
+            return [
+                'success' => false,
+                'message' => $error_message,
+                'context' => $context,
+                'error_type' => 'api_error',
+                'error_code' => $error_code
+            ];
+        }
+        
         if (!is_wp_error($order_details)) {
             // Check status_code first
             if (isset($order_details['status_code'])) {
@@ -223,12 +281,6 @@ class WCOSPA_Shipment_Handler
                 'context' => $context
             ];
         }
-        
-        return [
-            'success' => false,
-            'message' => $order_details->get_error_message(),
-            'context' => $context
-        ];
     }
 
     /**

@@ -185,3 +185,303 @@
     content: "...";
     display: inline-block;
 }
+
+/* ==========================================================================
+   5. Bulk Shipment Modal Styles
+   ========================================================================== */
+
+.wcospa-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    z-index: 100000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.wcospa-modal-content {
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+    max-width: 800px;
+    width: 90%;
+    max-height: 80vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.wcospa-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px 25px;
+    border-bottom: 1px solid #ddd;
+    background: #f9f9f9;
+}
+
+.wcospa-modal-header h3 {
+    margin: 0;
+    font-size: 18px;
+    color: #333;
+}
+
+.wcospa-modal-close {
+    background: none;
+    border: none;
+    font-size: 24px;
+    cursor: pointer;
+    color: #666;
+    padding: 0;
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    transition: background-color 0.2s;
+}
+
+.wcospa-modal-close:hover {
+    background-color: #e0e0e0;
+    color: #333;
+}
+
+.wcospa-modal-body {
+    padding: 25px;
+    overflow-y: auto;
+    flex: 1;
+}
+
+.wcospa-progress-container {
+    margin-bottom: 25px;
+}
+
+.wcospa-progress-bar {
+    width: 100%;
+    height: 20px;
+    background-color: #e0e0e0;
+    border-radius: 10px;
+    overflow: hidden;
+    margin-bottom: 10px;
+}
+
+.wcospa-progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #0073aa, #005a87);
+    transition: width 0.3s ease;
+    border-radius: 10px;
+}
+
+.wcospa-progress-text {
+    text-align: center;
+    font-weight: 600;
+    color: #333;
+    font-size: 14px;
+}
+
+.wcospa-results-container {
+    border-top: 1px solid #eee;
+    padding-top: 20px;
+}
+
+.wcospa-results-container h4 {
+    margin: 0 0 15px 0;
+    color: #333;
+    font-size: 16px;
+}
+
+.wcospa-results-list {
+    max-height: 300px;
+    overflow-y: auto;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 10px;
+    background: #f9f9f9;
+}
+
+.wcospa-result-item {
+    background: white;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    margin-bottom: 8px;
+    padding: 12px;
+    transition: border-color 0.2s;
+}
+
+.wcospa-result-success {
+    border-left: 4px solid #46b450;
+}
+
+.wcospa-result-error {
+    border-left: 4px solid #dc3232;
+}
+
+.wcospa-result-timeout {
+    border-left: 4px solid #ff9500;
+}
+
+.wcospa-result-server-error {
+    border-left: 4px solid #d63638;
+}
+
+.wcospa-result-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+    font-weight: 600;
+}
+
+.wcospa-result-order {
+    color: #333;
+}
+
+.wcospa-result-status {
+    padding: 2px 8px;
+    border-radius: 3px;
+    font-size: 12px;
+    font-weight: bold;
+    text-transform: uppercase;
+}
+
+.wcospa-result-success .wcospa-result-status {
+    background-color: #46b450;
+    color: white;
+}
+
+.wcospa-result-error .wcospa-result-status {
+    background-color: #dc3232;
+    color: white;
+}
+
+.wcospa-result-timeout .wcospa-result-status {
+    background-color: #ff9500;
+    color: white;
+}
+
+.wcospa-result-server-error .wcospa-result-status {
+    background-color: #d63638;
+    color: white;
+}
+
+.wcospa-result-time {
+    color: #666;
+    font-size: 12px;
+    font-family: monospace;
+}
+
+.wcospa-result-details {
+    font-size: 13px;
+    color: #555;
+}
+
+.wcospa-result-pronto,
+.wcospa-result-shipment {
+    margin-bottom: 4px;
+    font-family: monospace;
+}
+
+.wcospa-result-message {
+    font-style: italic;
+    color: #666;
+}
+
+.wcospa-result-error-type {
+    font-size: 11px;
+    color: #999;
+    font-family: monospace;
+    margin-top: 4px;
+}
+
+.wcospa-summary {
+    background: #f0f8ff;
+    border: 1px solid #0073aa;
+    border-radius: 4px;
+    padding: 15px;
+    margin-bottom: 20px;
+}
+
+.wcospa-summary h4 {
+    margin: 0 0 15px 0;
+    color: #0073aa;
+    font-size: 16px;
+}
+
+.wcospa-summary-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 10px;
+}
+
+.wcospa-summary-stat {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 12px;
+    background: white;
+    border-radius: 3px;
+    border: 1px solid #ddd;
+}
+
+.wcospa-summary-label {
+    font-weight: 600;
+    color: #333;
+}
+
+.wcospa-summary-value {
+    font-weight: bold;
+    font-family: monospace;
+}
+
+.wcospa-summary-value.wcospa-success {
+    color: #46b450;
+}
+
+.wcospa-summary-value.wcospa-error {
+    color: #dc3232;
+}
+
+.wcospa-summary-value.wcospa-timeout {
+    color: #ff9500;
+}
+
+.wcospa-summary-value.wcospa-server-error {
+    color: #d63638;
+}
+
+.wcospa-timeout-notice {
+    background: #fff3cd;
+    border: 1px solid #ffeaa7;
+    color: #856404;
+    padding: 10px;
+    border-radius: 4px;
+    margin-top: 15px;
+    font-size: 13px;
+}
+
+.wcospa-error-message {
+    background: #f8d7da;
+    border: 1px solid #f5c6cb;
+    color: #721c24;
+    padding: 12px;
+    border-radius: 4px;
+    margin-bottom: 15px;
+}
+
+/* ==========================================================================
+   6. Bulk Shipment Button Styles
+   ========================================================================== */
+
+#wcospa-bulk-shipment {
+    margin-right: 8px;
+}
+
+#wcospa-bulk-shipment.loading {
+    opacity: 0.7;
+    cursor: not-allowed;
+}
