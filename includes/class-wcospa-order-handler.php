@@ -100,7 +100,7 @@ class WCOSPA_Order_Handler
         $response = WCOSPA_API_Client::sync_order($order_id);
 
         if (is_wp_error($response)) {
-            WCOSPA_Logger::error(sprintf('Order sync failed: %s', $response->get_error_message()));
+            WCOSPA_Logger::log_order_error($order_id, sprintf('Order sync failed: %s', $response->get_error_message()));
         } else {
             $order = wc_get_order($order_id);
             $order->update_status('wc-preparing-to-ship', 'Order marked as Preparing to Ship after successful API sync.');
@@ -1222,9 +1222,9 @@ class WCOSPA_Bulk_Shipment_Handler
                     $message = 'Request timed out (524 error)';
                     
                                          // Log timeout error specifically
-                     WCOSPA_Logger::error(
-                         sprintf('BULK TIMEOUT: Order %d shipment fetch timed out: %s (%.2fms)', 
-                             $order_id,
+                     WCOSPA_Logger::log_order_error(
+                         $order_id,
+                         sprintf('Bulk shipment fetch timed out: %s (%.2fms)',
                              $result['message'],
                              $processing_time
                          )
@@ -1234,9 +1234,9 @@ class WCOSPA_Bulk_Shipment_Handler
                     $message = 'Server error occurred';
                     
                                          // Log server error specifically
-                     WCOSPA_Logger::error(
-                         sprintf('BULK SERVER ERROR: Order %d shipment fetch server error: %s (%.2fms)', 
-                             $order_id,
+                     WCOSPA_Logger::log_order_error(
+                         $order_id,
+                         sprintf('Bulk shipment fetch server error: %s (%.2fms)',
                              $result['message'],
                              $processing_time
                          )
@@ -1257,14 +1257,14 @@ class WCOSPA_Bulk_Shipment_Handler
             ];
 
             // Log the result
-            wc_get_logger()->info(
-                sprintf('Bulk shipment processing: Order %d - %s - %s (%.2fms)', 
-                    $order_id,
+            WCOSPA_Logger::info(
+                sprintf('Bulk shipment processing: %s - %s (%.2fms)',
                     strtoupper($status),
                     $message,
                     $processing_time
                 ),
-                ['source' => 'wcospa']
+                [],
+                $order_id
             );
             
             // Add a small delay between requests to respect API rate limits and reduce server load
