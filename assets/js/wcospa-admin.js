@@ -220,6 +220,80 @@ document.addEventListener("DOMContentLoaded", function () {
         }
     }
 
+    // Debug Scheduled Events button
+    var debugEventsButton = document.getElementById("wcospa-debug-scheduled-events");
+    if (debugEventsButton) {
+        debugEventsButton.addEventListener("click", function () {
+            performDebugAction('wcospa_debug_scheduled_events', 'Debugging scheduled events...', 'debug_output');
+        });
+    }
+
+    // Test Shipment Processing button
+    var testProcessingButton = document.getElementById("wcospa-test-shipment-processing");
+    if (testProcessingButton) {
+        testProcessingButton.addEventListener("click", function () {
+            performDebugAction('wcospa_test_shipment_processing', 'Testing shipment processing...', 'test_output');
+        });
+    }
+
+    // Reset Scheduled Events button
+    var resetEventsButton = document.getElementById("wcospa-reset-scheduled-events");
+    if (resetEventsButton) {
+        resetEventsButton.addEventListener("click", function () {
+            if (confirm("Are you sure you want to reset all scheduled events? This will clear and recreate the shipment tracking schedule.")) {
+                performDebugAction('wcospa_reset_scheduled_events', 'Resetting scheduled events...', 'reset_output');
+            }
+        });
+    }
+
+    // Function to perform debug actions
+    function performDebugAction(actionName, loadingText, outputKey) {
+        const button = document.getElementById(actionName.replace('wcospa_', 'wcospa-'));
+        const debugOutput = document.getElementById('wcospa-debug-output');
+        const debugContent = document.getElementById('wcospa-debug-content');
+        
+        // Show loading state
+        button.disabled = true;
+        button.textContent = loadingText;
+        debugOutput.style.display = 'block';
+        debugContent.textContent = 'Loading...';
+        
+        // Prepare form data
+        const formData = new FormData();
+        formData.append('action', actionName);
+        formData.append('nonce', wcospaAdmin.nonce);
+        
+        // Make the AJAX request
+        fetch(ajaxurl, {
+            method: 'POST',
+            body: formData,
+            credentials: 'same-origin'
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                debugContent.textContent = data.data[outputKey] || 'Action completed successfully';
+                showMessage('success', 'Debug action completed successfully');
+            } else {
+                debugContent.textContent = 'Error: ' + (data.data.message || 'Unknown error occurred');
+                showMessage('error', data.data.message || 'Failed to execute debug action');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            debugContent.textContent = 'Network error: ' + error.message;
+            showMessage('error', 'Network error occurred');
+        })
+        .finally(() => {
+            // Reset button state
+            button.disabled = false;
+            button.textContent = button.getAttribute('data-original-text') || 
+                               (actionName === 'wcospa_debug_scheduled_events' ? 'Debug Scheduled Events' :
+                                actionName === 'wcospa_test_shipment_processing' ? 'Test Shipment Processing' :
+                                'Reset Scheduled Events');
+        });
+    }
+
     // Fetch Order Buttons handling
     var fetchButtons = document.querySelectorAll(".fetch-order-button");
     function handleFetchButton(button) {

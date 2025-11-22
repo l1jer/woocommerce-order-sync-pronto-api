@@ -25,6 +25,9 @@ class WCOSPA_Admin_Sync_Status
         add_action('wp_ajax_wcospa_toggle_environment', [__CLASS__, 'handle_environment_toggle']);
         add_action('wp_ajax_wcospa_update_debtor_code', [__CLASS__, 'handle_debtor_code_update']);
         add_action('wp_ajax_wcospa_update_afterpay_code', [__CLASS__, 'handle_afterpay_code_update']);
+        add_action('wp_ajax_wcospa_debug_scheduled_events', [__CLASS__, 'handle_debug_scheduled_events']);
+        add_action('wp_ajax_wcospa_test_shipment_processing', [__CLASS__, 'handle_test_shipment_processing']);
+        add_action('wp_ajax_wcospa_reset_scheduled_events', [__CLASS__, 'handle_reset_scheduled_events']);
     }
 
     public static function add_sync_status_menu()
@@ -121,6 +124,18 @@ class WCOSPA_Admin_Sync_Status
                         <li><?php _e('Log location:', 'wcospa'); ?> <code>plugins/woocommerce-order-sync-pronto-api/logs/</code></li>
                         <li><?php _e('Order logs path:', 'wcospa'); ?> <code>plugins/woocommerce-order-sync-pronto-api/logs/orders/XXXX/order-XXXX.log</code></li>
                     </ul>
+                </div>
+            </div>
+            
+            <div class="wcospa-settings-section">
+                <h2><?php _e('Scheduled Events Debug', 'wcospa'); ?></h2>
+                <p><?php _e('Debug and test the scheduled shipment tracking system:', 'wcospa'); ?></p>
+                <button id="wcospa-debug-scheduled-events" class="button button-secondary"><?php _e('Debug Scheduled Events', 'wcospa'); ?></button>
+                <button id="wcospa-test-shipment-processing" class="button button-secondary"><?php _e('Test Shipment Processing', 'wcospa'); ?></button>
+                <button id="wcospa-reset-scheduled-events" class="button button-primary"><?php _e('Reset Scheduled Events', 'wcospa'); ?></button>
+                <div id="wcospa-debug-output" style="margin-top: 15px; padding: 10px; background: #f0f0f0; border-left: 4px solid #0073aa; display: none;">
+                    <h4><?php _e('Debug Output:', 'wcospa'); ?></h4>
+                    <pre id="wcospa-debug-content"></pre>
                 </div>
             </div>
             
@@ -306,6 +321,77 @@ class WCOSPA_Admin_Sync_Status
         } else {
             wp_send_json_error(__('Failed to update Afterpay code.', 'wcospa'));
         }
+    }
+
+    /**
+     * Handle debug scheduled events AJAX request
+     */
+    public static function handle_debug_scheduled_events()
+    {
+        check_ajax_referer('wcospa_admin_nonce', 'nonce');
+        
+        if (!current_user_can('manage_woocommerce')) {
+            wp_send_json_error(['message' => 'Insufficient permissions']);
+        }
+        
+        // Start output buffering to capture debug output
+        ob_start();
+        
+        // Call the debug function
+        WCOSPA_Shipment_Handler::debug_scheduled_events();
+        
+        // Get the captured debug output from the logger
+        $log_file = WCOSPA_Logger::get_recent_logs(100);
+        $debug_output = implode("\n", array_slice($log_file, -20)); // Get last 20 log entries
+        
+        ob_end_clean();
+        
+        wp_send_json_success(['debug_output' => $debug_output]);
+    }
+
+    /**
+     * Handle test shipment processing AJAX request
+     */
+    public static function handle_test_shipment_processing()
+    {
+        check_ajax_referer('wcospa_admin_nonce', 'nonce');
+        
+        if (!current_user_can('manage_woocommerce')) {
+            wp_send_json_error(['message' => 'Insufficient permissions']);
+        }
+        
+        WCOSPA_Logger::info('Manual test of shipment processing initiated from admin');
+        
+        // Test the shipment processing function
+        WCOSPA_Shipment_Handler::process_pending_shipments();
+        
+        $log_entries = WCOSPA_Logger::get_recent_logs(50);
+        $test_output = implode("\n", array_slice($log_entries, -10)); // Get last 10 log entries
+        
+        wp_send_json_success(['test_output' => $test_output]);
+    }
+
+    /**
+     * Handle reset scheduled events AJAX request
+     */
+    public static function handle_reset_scheduled_events()
+    {
+        check_ajax_referer('wcospa_admin_nonce', 'nonce');
+        
+        if (!current_user_can('manage_woocommerce')) {
+            wp_send_json_error(['message' => 'Insufficient permissions']);
+        }
+        
+        WCOSPA_Logger::info('Manual reset of scheduled events initiated from admin');
+        
+        // Reset the scheduled events
+        WCOSPA_Shipment_Handler::deactivate();
+        WCOSPA_Shipment_Handler::activate();
+        
+        $log_entries = WCOSPA_Logger::get_recent_logs(50);
+        $reset_output = implode("\n", array_slice($log_entries, -15)); // Get last 15 log entries
+        
+        wp_send_json_success(['reset_output' => $reset_output]);
     }
 }
 

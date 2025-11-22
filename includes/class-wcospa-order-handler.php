@@ -908,6 +908,8 @@ class WCOSPA_Order_Data_Formatter
             'ppcp' => 'PP',          // PayPal
             'afterpay' => 'CC', // AfterPay
             'stripe_cc' => 'CC', // Stripe Credit Card
+            'stripe_zip' => 'CC', // ZIP (Stripe)
+            'stripe_applepay' => 'CC', // Apple Pay (Stripe)
         ];
 
         // Check if the payment method exists in the mapping
@@ -928,6 +930,10 @@ class WCOSPA_Order_Data_Formatter
                 return 'STRIPE';
             case 'afterpay':
                 return self::get_afterpay_code();
+            case 'stripe_zip':
+                return 'STRIPE';
+            case 'stripe_applepay':
+                return 'STRIPE';
             default:
                 return '';
         }
@@ -988,6 +994,12 @@ class WCOSPA_Order_Data_Formatter
                 break;
             case 'afterpay':
                 $description = 'AfterPay';
+                break;
+            case 'stripe_zip':
+                $description = 'ZIP';
+                break;
+            case 'stripe_applepay':
+                $description = 'Apple Pay';
                 break;
         }
 

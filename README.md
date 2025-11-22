@@ -69,6 +69,22 @@ Advanced Shipment Tracking integration:
 - Automatic status update to "Completed" upon tracking number receipt
 - Tracking information added automatically after successful fetch
 
+#### Supported Payment Methods
+
+The plugin supports the following payment gateways with automatic mapping to Pronto API:
+
+| Payment Gateway | WooCommerce ID | Pronto Code | Bank Code | Description |
+|---|---|---|---|---|
+| PayPal | `ppcp` | `PP` | `PAYPAL` | PayPal |
+| AfterPay | `afterpay` | `CC` | Dynamic* | AfterPay |
+| Stripe Credit Card | `stripe_cc` | `CC` | `STRIPE` | Stripe - Credit Card |
+| ZIP | `stripe_zip` | `CC` | `STRIPE` | ZIP |
+| Apple Pay | `stripe_applepay` | `CC` | `STRIPE` | Apple Pay |
+
+*AfterPay bank code is dynamically determined based on the site domain (configured in admin settings).
+
+All payment methods automatically add a descriptive line item to the order for accountant reference.
+
 #### Key Action Hooks
 
 The plugin responds to these WordPress hooks:
@@ -109,6 +125,45 @@ The plugin introduces a custom order status:
 This plugin is licensed under the GPLv2 or later. For more information, see https://www.gnu.org/licenses/gpl-2.0.html.
 
 ### Changelog
+
+#### 1.6.7
+- **Enhancement:** Added support for additional payment methods
+  - **ZIP payment support**: Added `stripe_zip` payment gateway mapping
+  - **Apple Pay support**: Added `stripe_applepay` payment gateway mapping
+  - Both methods map to Pronto `CC` (Credit Card) code with `STRIPE` bank code
+  - Payment method descriptions automatically added to order line items
+  - Updated documentation with comprehensive payment method reference table
+
+#### 1.6.6a
+- **Critical Fix:** Corrected incorrect implementation of shipment tracking schedule times
+  - **Fixed schedule implementation**: Corrected all scheduling methods to match task 1.6.6 requirements exactly
+  - **Updated init() method**: Now uses correct times (Monday-Thursday: 9:00 AM, 12:00 PM, 2:00 PM, 5:30 PM; Friday: 9:00 AM, 12:00 PM)
+  - **Updated setup_initial_schedule() method**: Fixed activation schedule setup with correct times
+  - **Updated schedule_next_check() method**: Fixed recurring schedule logic with correct times
+  - **Removed obsolete logic**: Eliminated Friday 5:00 PM filtering since 5:00 PM is now 5:30 PM and only occurs Monday-Thursday
+  - **Updated documentation**: Corrected all comments and documentation to reflect accurate schedule times
+
+#### 1.6.6
+- **Fix:** Reviewed and debugged scheduled event system to ensure proper execution
+  - **Fixed critical bug**: Missing `$check_time` variable initialization in shipment handler's `init()` method
+  - **Added comprehensive logging**: All scheduled events now have detailed logging for tracking execution
+  - **Added proper activation/deactivation hooks**: Scheduled events are now properly set up during plugin activation and cleaned up during deactivation  
+  - **Added debug functionality**: New admin interface with buttons to debug, test, and reset scheduled events
+  - **Enhanced timezone handling**: Improved Sydney timezone calculations and WordPress cron integration
+  - **Added scheduled event validation**: System now verifies WordPress cron status, timezone settings, and event registration
+  - **Implemented comprehensive error tracking**: All shipment processing failures are logged with order-specific details
+  - **Added manual testing capabilities**: Admin can now manually trigger shipment processing and view real-time results
+  - **Enhanced shipment tracking schedule**: Monday-Thursday at 9:00 AM, 12:00 PM, 2:00 PM, 5:30 PM; Friday at 9:00 AM, 12:00 PM (Sydney time)
+  - **Fixed WordPress cron integration**: Proper cleanup and registration of scheduled events to prevent conflicts
+
+#### 1.6.6a
+- **Critical Fix:** Corrected incorrect implementation of shipment tracking schedule times
+  - **Fixed schedule implementation**: Corrected all scheduling methods to match task 1.6.6 requirements exactly
+  - **Updated init() method**: Now uses correct times (Monday-Thursday: 9:00 AM, 12:00 PM, 2:00 PM, 5:30 PM; Friday: 9:00 AM, 12:00 PM)
+  - **Updated setup_initial_schedule() method**: Fixed activation schedule setup with correct times
+  - **Updated schedule_next_check() method**: Fixed recurring schedule logic with correct times
+  - **Removed obsolete logic**: Eliminated Friday 5:00 PM filtering since 5:00 PM is now 5:30 PM and only occurs Monday-Thursday
+  - **Updated documentation**: Corrected all comments and documentation to reflect accurate schedule times
 
 #### 1.6.5
 - **Feature:** Implemented dedicated plugin logging system with performance optimization and order-specific logging
