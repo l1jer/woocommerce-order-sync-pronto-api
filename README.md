@@ -126,6 +126,22 @@ This plugin is licensed under the GPLv2 or later. For more information, see http
 
 ### Changelog
 
+#### 1.6.9b
+- **Fix:** Improved API response logging quality and completeness
+  - Replaced `print_r()` with `wp_json_encode()` for structured logging
+  - Fixed truncated log entries for large API responses
+  - Updated all deprecated `self::log()` calls to use new `WCOSPA_Logger` with order context
+  - JSON-formatted logs are easier to read and won't be cut off mid-response
+  - Better debugging capability for API communication issues
+
+#### 1.6.9a
+- **Fix:** Reduced excessive debug logging in production
+  - Removed verbose DEBUG logs from `init()` method that were being called on every page load
+  - Now only logs when actually setting up new schedules (INFO level)
+  - Eliminated "Shipment tracking events already scheduled, skipping setup" repetitive messages
+  - Significantly reduced log file size and improved performance
+  - Only meaningful events are now logged (schedule creation, processing runs, errors)
+
 #### 1.6.9
 - **Performance Enhancement:** Increased shipment tracking processing capacity and speed
   - **Doubled processing capacity**: Increased from 5 to 10 orders per scheduled run

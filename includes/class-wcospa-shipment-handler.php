@@ -14,14 +14,10 @@ class WCOSPA_Shipment_Handler
      */
     public static function init()
     {
-        // Log initialization attempt
-        WCOSPA_Logger::debug('WCOSPA_Shipment_Handler::init() called');
-        
-        // Remove existing schedule if any
+        // Remove existing schedule if any (silent operation)
         $timestamp = wp_next_scheduled('wcospa_process_shipment_tracking');
         if ($timestamp) {
             wp_unschedule_event($timestamp, 'wcospa_process_shipment_tracking');
-            WCOSPA_Logger::debug('Unscheduled old wcospa_process_shipment_tracking event');
         }
 
         // Schedule multiple daily checks as per task 1.6.6
@@ -70,16 +66,13 @@ class WCOSPA_Shipment_Handler
             }
             
             WCOSPA_Logger::info('Completed setting up shipment tracking scheduled events');
-        } else {
-            WCOSPA_Logger::debug('Shipment tracking events already scheduled, skipping setup');
         }
+        // Skip debug logging when events already scheduled to reduce log noise
 
         // Add action hooks
         add_action('wcospa_process_shipment_tracking_scheduled', [__CLASS__, 'schedule_next_check']);
         add_action('wcospa_process_shipment_tracking_scheduled', [__CLASS__, 'process_pending_shipments']);
         add_action('wcospa_pronto_order_number_received', [__CLASS__, 'schedule_shipment_tracking'], 10, 2);
-        
-        WCOSPA_Logger::debug('WCOSPA_Shipment_Handler::init() completed successfully');
     }
 
     /**

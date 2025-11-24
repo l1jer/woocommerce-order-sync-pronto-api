@@ -98,13 +98,13 @@ class WCOSPA_API_Client
                 return new WP_Error('json_decode_error', 'Failed to decode API response.');
             }
 
-            self::log(sprintf('Sync response body: %s', print_r($body_data, true)));
+            WCOSPA_Logger::debug(sprintf('Sync response: %s', wp_json_encode($body_data)), [], $order_id);
 
             // Extract the Transaction UUID from the apitransactions array
             if (!isset($body_data['apitransactions'][0]['uuid'])) {
-                self::log(sprintf('Transaction UUID not found in sync response. Response structure: %s', 
-                    print_r($body_data, true)
-                ));
+                WCOSPA_Logger::error(sprintf('Transaction UUID not found in sync response. Response: %s', 
+                    wp_json_encode($body_data)
+                ), [], $order_id);
                 return new WP_Error('uuid_not_found', 'Transaction UUID not found in API response.');
             }
 
@@ -134,7 +134,7 @@ class WCOSPA_API_Client
                 'result_url' => isset($body_data['apitransactions'][0]['result_url']) ? $body_data['apitransactions'][0]['result_url'] : null
             ];
             
-            self::log(sprintf('Transaction Details: %s', print_r($transaction_details, true)));
+            WCOSPA_Logger::debug(sprintf('Transaction Details: %s', wp_json_encode($transaction_details)), [], $order_id);
 
             return $transaction_uuid;
 
@@ -306,7 +306,7 @@ class WCOSPA_API_Client
         }
 
         $body = json_decode(wp_remote_retrieve_body($response), true);
-        self::log('Pronto Order response body: ' . print_r($body, true));
+        WCOSPA_Logger::debug(sprintf('Pronto Order response: %s', wp_json_encode($body)), [], $order_id);
 
         if (empty($body) || !isset($body['orders']) || !is_array($body['orders']) || empty($body['orders'])) {
             return new WP_Error('empty_response', 'The API returned an invalid response.');
