@@ -87,22 +87,22 @@ class WCOSPA_API_Client
             // Check if the response body is empty
             $body = wp_remote_retrieve_body($response);
             if (empty($body)) {
-                self::log('Sync response body is empty.');
+                WCOSPA_Logger::error('Sync response body is empty.', [], $order_id);
                 return new WP_Error('empty_response', 'The API returned an empty response.');
             }
 
             // Decode the response body and log for debugging
             $body_data = json_decode($body, true);
             if (json_last_error() !== JSON_ERROR_NONE) {
-                self::log(sprintf('JSON decode error: %s', json_last_error_msg()));
+                WCOSPA_Logger::error(sprintf('JSON decode error: %s', json_last_error_msg()), [], $order_id);
                 return new WP_Error('json_decode_error', 'Failed to decode API response.');
             }
 
-            WCOSPA_Logger::debug(sprintf('Sync response: %s', wp_json_encode($body_data)), [], $order_id);
+            WCOSPA_Logger::debug(sprintf('Sync response body: %s', wp_json_encode($body_data)), [], $order_id);
 
             // Extract the Transaction UUID from the apitransactions array
             if (!isset($body_data['apitransactions'][0]['uuid'])) {
-                WCOSPA_Logger::error(sprintf('Transaction UUID not found in sync response. Response: %s', 
+                WCOSPA_Logger::error(sprintf('Transaction UUID not found in sync response. Response structure: %s', 
                     wp_json_encode($body_data)
                 ), [], $order_id);
                 return new WP_Error('uuid_not_found', 'Transaction UUID not found in API response.');
@@ -114,15 +114,15 @@ class WCOSPA_API_Client
             $updated = update_post_meta($order_id, '_wcospa_transaction_uuid', $transaction_uuid);
             
             if ($updated) {
-                self::log(sprintf('Successfully stored Transaction UUID: %s for order %d', 
+                WCOSPA_Logger::info(sprintf('Successfully stored Transaction UUID: %s for order %d', 
                     $transaction_uuid, 
                     $order_id
-                ));
+                ), [], $order_id);
             } else {
-                self::log(sprintf('Failed to store Transaction UUID: %s for order %d', 
+                WCOSPA_Logger::error(sprintf('Failed to store Transaction UUID: %s for order %d', 
                     $transaction_uuid, 
                     $order_id
-                ));
+                ), [], $order_id);
             }
 
             // Log the full transaction details for debugging
@@ -139,7 +139,7 @@ class WCOSPA_API_Client
             return $transaction_uuid;
 
         } catch (Exception $e) {
-            self::log(sprintf('Exception occurred: %s', $e->getMessage()));
+            WCOSPA_Logger::error(sprintf('Exception occurred: %s', $e->getMessage()), [], $order_id);
             return new WP_Error('sync_exception', $e->getMessage());
         }
     }
@@ -177,7 +177,7 @@ class WCOSPA_API_Client
             $transaction_url = $credentials['get_transaction'] . '?uuid=' . urlencode($transaction_uuid);
 
             // Log the transaction URL for debugging
-            self::log(sprintf('Transaction URL: %s', $transaction_url));
+            WCOSPA_Logger::debug(sprintf('Transaction URL: %s', $transaction_url), [], $order_id);
 
             // Make the GET request to the API with timeout handling
             $response = wp_remote_get($transaction_url, [
@@ -192,61 +192,61 @@ class WCOSPA_API_Client
                 
                 // Check for 524 timeout or other timeout indicators
                 if (self::is_timeout_error($response, $error_message)) {
-                    self::log(sprintf('[TIMEOUT ERROR] Fetch API request timed out for order %d: %s', $order_id, $error_message));
+                    WCOSPA_Logger::error(sprintf('[TIMEOUT ERROR] Fetch API request timed out for order %d: %s', $order_id, $error_message), [], $order_id);
                     return new WP_Error('api_timeout', sprintf('API request timed out after 110 seconds for order %d. This indicates a server-side timeout (likely 524 error).', $order_id));
                 }
                 
-                self::log('Fetch API request failed: ' . $error_message);
+                WCOSPA_Logger::error('Fetch API request failed: ' . $error_message, [], $order_id);
                 return $response;
             }
 
             // Check HTTP response code for 524 or other timeout-related codes
             $response_code = wp_remote_retrieve_response_code($response);
             if ($response_code === 524) {
-                self::log(sprintf('[524 TIMEOUT ERROR] Server timeout detected for order %d fetch request', $order_id));
+                WCOSPA_Logger::error(sprintf('[524 TIMEOUT ERROR] Server timeout detected for order %d fetch request', $order_id), [], $order_id);
                 return new WP_Error('server_timeout_524', sprintf('Server returned 524 timeout error for order %d. Request exceeded server timeout limit.', $order_id));
             }
             
             if (in_array($response_code, [502, 503, 504, 522, 523])) {
-                self::log(sprintf('[SERVER ERROR] Server error %d detected for order %d fetch request', $response_code, $order_id));
+                WCOSPA_Logger::error(sprintf('[SERVER ERROR] Server error %d detected for order %d fetch request', $response_code, $order_id), [], $order_id);
                 return new WP_Error('server_error', sprintf('Server returned error code %d for order %d. Please try again later.', $response_code, $order_id));
             }
 
             // Get the response body
             $body = wp_remote_retrieve_body($response);
             if (empty($body)) {
-                self::log('Empty response received from API');
+                WCOSPA_Logger::error('Empty response received from API', [], $order_id);
                 return new WP_Error('empty_response', 'Empty response received from API');
             }
 
             // Decode the JSON response
             $data = json_decode($body, true);
             if (json_last_error() !== JSON_ERROR_NONE) {
-                self::log('Failed to decode JSON response: ' . json_last_error_msg());
+                WCOSPA_Logger::error('Failed to decode JSON response: ' . json_last_error_msg(), [], $order_id);
                 return new WP_Error('json_decode_error', 'Failed to decode API response');
             }
 
             // Log the raw response for debugging
-            self::log('Raw Response Body: ' . $body);
+            WCOSPA_Logger::debug('Raw Response Body: ' . $body, [], $order_id);
 
             // Check if we have the required data
             if (!isset($data['apitransactions'][0]['result_url'])) {
-                self::log('No result_url found in response');
+                WCOSPA_Logger::error('No result_url found in response', [], $order_id);
                 return new WP_Error('no_result_url', 'No result URL found in response');
             }
 
             // Extract order number from result_url
             if (preg_match('/number=(\d+)/', $data['apitransactions'][0]['result_url'], $matches)) {
                 $pronto_order_number = $matches[1];
-                self::log(sprintf('Successfully extracted Pronto Order Number: %s', $pronto_order_number));
+                WCOSPA_Logger::info(sprintf('Successfully extracted Pronto Order Number: %s', $pronto_order_number), [], $order_id);
                 return $pronto_order_number;
             }
 
-            self::log('Could not extract order number from result_url');
+            WCOSPA_Logger::error('Could not extract order number from result_url', [], $order_id);
             return new WP_Error('no_order_number', 'Could not extract order number from result URL');
 
         } catch (Exception $e) {
-            self::log('Exception occurred: ' . $e->getMessage());
+            WCOSPA_Logger::error('Exception occurred: ' . $e->getMessage(), [], $order_id);
             return new WP_Error('fetch_exception', $e->getMessage());
         }
     }
@@ -270,7 +270,7 @@ class WCOSPA_API_Client
         $order_url = $credentials['get_order'] . '?number=' . $pronto_order_number;
 
         // Log the order URL for debugging
-        self::log('Order URL: ' . $order_url);
+        WCOSPA_Logger::debug('Order URL: ' . $order_url, [], $order_id);
 
         // Make the GET request to the API with timeout handling
         $response = wp_remote_get($order_url, [
@@ -285,28 +285,28 @@ class WCOSPA_API_Client
             
             // Check for 524 timeout or other timeout indicators
             if (self::is_timeout_error($response, $error_message)) {
-                self::log(sprintf('[TIMEOUT ERROR] Pronto Order API request timed out for order %d: %s', $order_id, $error_message));
+                WCOSPA_Logger::error(sprintf('[TIMEOUT ERROR] Pronto Order API request timed out for order %d: %s', $order_id, $error_message), [], $order_id);
                 return new WP_Error('api_timeout', sprintf('API request timed out after 110 seconds for order %d. This indicates a server-side timeout (likely 524 error).', $order_id));
             }
             
-            self::log('Pronto Order API request failed: ' . $error_message);
+            WCOSPA_Logger::error('Pronto Order API request failed: ' . $error_message, [], $order_id);
             return $response;
         }
 
         // Check HTTP response code for 524 or other timeout-related codes
         $response_code = wp_remote_retrieve_response_code($response);
         if ($response_code === 524) {
-            self::log(sprintf('[524 TIMEOUT ERROR] Server timeout detected for order %d Pronto Order details request', $order_id));
+            WCOSPA_Logger::error(sprintf('[524 TIMEOUT ERROR] Server timeout detected for order %d Pronto Order details request', $order_id), [], $order_id);
             return new WP_Error('server_timeout_524', sprintf('Server returned 524 timeout error for order %d. Request exceeded server timeout limit.', $order_id));
         }
         
         if (in_array($response_code, [502, 503, 504, 522, 523])) {
-            self::log(sprintf('[SERVER ERROR] Server error %d detected for order %d Pronto Order details request', $response_code, $order_id));
+            WCOSPA_Logger::error(sprintf('[SERVER ERROR] Server error %d detected for order %d Pronto Order details request', $response_code, $order_id), [], $order_id);
             return new WP_Error('server_error', sprintf('Server returned error code %d for order %d. Please try again later.', $response_code, $order_id));
         }
 
         $body = json_decode(wp_remote_retrieve_body($response), true);
-        WCOSPA_Logger::debug(sprintf('Pronto Order response: %s', wp_json_encode($body)), [], $order_id);
+        WCOSPA_Logger::debug(sprintf('Pronto Order response body: %s', wp_json_encode($body)), [], $order_id);
 
         if (empty($body) || !isset($body['orders']) || !is_array($body['orders']) || empty($body['orders'])) {
             return new WP_Error('empty_response', 'The API returned an invalid response.');
@@ -401,19 +401,19 @@ class WCOSPA_API_Client
         if (is_wp_error($response)) {
             $error_message = $response->get_error_message();
             if (self::is_timeout_error($response, $error_message)) {
-                self::log(sprintf('[TIMEOUT ERROR] API request timed out for URL %s: %s', $url, $error_message));
+                WCOSPA_Logger::error(sprintf('[TIMEOUT ERROR] API request timed out for URL %s: %s', $url, $error_message));
                 return new WP_Error('api_timeout', sprintf('API request timed out after 110 seconds. This indicates a server-side timeout (likely 524 error).'));
             }
         } else {
             // Check HTTP response code for 524 or other timeout-related codes
             $response_code = wp_remote_retrieve_response_code($response);
             if ($response_code === 524) {
-                self::log(sprintf('[524 TIMEOUT ERROR] Server timeout detected for URL %s', $url));
+                WCOSPA_Logger::error(sprintf('[524 TIMEOUT ERROR] Server timeout detected for URL %s', $url));
                 return new WP_Error('server_timeout_524', 'Server returned 524 timeout error. Request exceeded server timeout limit.');
             }
             
             if (in_array($response_code, [502, 503, 504, 522, 523])) {
-                self::log(sprintf('[SERVER ERROR] Server error %d detected for URL %s', $response_code, $url));
+                WCOSPA_Logger::error(sprintf('[SERVER ERROR] Server error %d detected for URL %s', $response_code, $url));
                 return new WP_Error('server_error', sprintf('Server returned error code %d. Please try again later.', $response_code));
             }
         }
