@@ -205,6 +205,53 @@ class WCOSPA_Shipment_Handler
     }
 
     /**
+     * Recover orphaned orders that are missing shipment tracking start meta
+     * These orders have Pronto numbers but were never added to the tracking queue
+     */
+    public static function recover_orphaned_orders()
+    {
+        global $wpdb;
+        
+        // Find orders in "Preparing to Ship" status with Pronto numbers but missing tracking start meta
+        $orphaned_orders = $wpdb->get_results("
+            SELECT DISTINCT o.ID as order_id, pm1.meta_value as pronto_order_number
+            FROM {$wpdb->posts} o
+            JOIN {$wpdb->postmeta} pm1 ON o.ID = pm1.post_id
+            WHERE o.post_type = 'shop_order'
+            AND o.post_status = 'wc-preparing-to-ship'
+            AND pm1.meta_key = '_wcospa_pronto_order_number'
+            AND NOT EXISTS (
+                SELECT 1 FROM {$wpdb->postmeta} pm2
+                WHERE pm2.post_id = o.ID
+                AND pm2.meta_key = '_wcospa_shipment_number'
+            )
+            AND NOT EXISTS (
+                SELECT 1 FROM {$wpdb->postmeta} pm3
+                WHERE pm3.post_id = o.ID
+                AND pm3.meta_key = '_wcospa_shipment_tracking_start'
+            )
+            ORDER BY o.ID ASC
+        ");
+        
+        if (!empty($orphaned_orders)) {
+            WCOSPA_Logger::warning(sprintf('Found %d orphaned orders missing shipment tracking start meta', count($orphaned_orders)));
+            
+            foreach ($orphaned_orders as $order_data) {
+                $order_id = (int) $order_data->order_id;
+                
+                // Add the missing tracking start meta
+                update_post_meta($order_id, '_wcospa_shipment_tracking_start', time());
+                update_post_meta($order_id, '_wcospa_shipment_tracking_attempts', 0);
+                
+                WCOSPA_Logger::info(sprintf('Recovered orphaned order %d (Pronto: %s) - added to tracking queue', 
+                    $order_id, 
+                    $order_data->pronto_order_number
+                ), [], $order_id);
+            }
+        }
+    }
+
+    /**
      * Process pending shipments that need tracking information
      */
     public static function process_pending_shipments()
@@ -213,20 +260,28 @@ class WCOSPA_Shipment_Handler
         
         global $wpdb;
 
+        // First, fix any orphaned orders (orders missing tracking start meta)
+        self::recover_orphaned_orders();
+
+        // Now get orders that need shipment tracking
         $query = $wpdb->prepare("
-            SELECT pm1.post_id, pm1.meta_value as pronto_order_number, pm2.meta_value as tracking_start 
+            SELECT pm1.post_id, pm1.meta_value as pronto_order_number, 
+                   COALESCE(pm2.meta_value, '0') as tracking_start 
             FROM {$wpdb->postmeta} pm1
-            JOIN {$wpdb->postmeta} pm2 ON pm1.post_id = pm2.post_id
+            LEFT JOIN {$wpdb->postmeta} pm2 ON pm1.post_id = pm2.post_id 
+                AND pm2.meta_key = '_wcospa_shipment_tracking_start'
+            JOIN {$wpdb->posts} o ON pm1.post_id = o.ID
             WHERE pm1.meta_key = '_wcospa_pronto_order_number'
-            AND pm2.meta_key = '_wcospa_shipment_tracking_start'
+            AND o.post_type = 'shop_order'
+            AND o.post_status = 'wc-preparing-to-ship'
             AND NOT EXISTS (
                 SELECT 1 FROM {$wpdb->postmeta} pm3
                 WHERE pm3.post_id = pm1.post_id
                 AND pm3.meta_key = '_wcospa_shipment_number'
             )
-            ORDER BY pm2.meta_value ASC
+            ORDER BY CAST(COALESCE(pm2.meta_value, '0') AS UNSIGNED) ASC
             LIMIT %d
-        ", 5);
+        ", 10);
 
         $results = $wpdb->get_results($query);
 
@@ -240,7 +295,7 @@ class WCOSPA_Shipment_Handler
         foreach ($results as $index => $order_data) {
             // Add delay between requests
             if ($index > 0) {
-                sleep(3);
+                sleep(1);
             }
 
             $order_id = (int) $order_data->post_id;

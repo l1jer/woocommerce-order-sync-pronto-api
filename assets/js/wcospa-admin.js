@@ -246,6 +246,65 @@ document.addEventListener("DOMContentLoaded", function () {
         });
     }
 
+    // Recover Orphaned Orders button
+    var recoverOrphanedButton = document.getElementById("wcospa-recover-orphaned-orders");
+    if (recoverOrphanedButton) {
+        recoverOrphanedButton.addEventListener("click", function () {
+            if (confirm("This will search for orders stuck in 'Preparing to Ship' status and add them to the shipment tracking queue. Continue?")) {
+                performRecoveryAction();
+            }
+        });
+    }
+
+    // Function to perform recovery action
+    function performRecoveryAction() {
+        const button = document.getElementById('wcospa-recover-orphaned-orders');
+        const recoveryOutput = document.getElementById('wcospa-recovery-output');
+        const recoveryContent = document.getElementById('wcospa-recovery-content');
+        
+        // Show loading state
+        button.disabled = true;
+        button.textContent = 'Recovering orders...';
+        recoveryOutput.style.display = 'block';
+        recoveryContent.textContent = 'Scanning for orphaned orders...';
+        
+        // Prepare form data
+        const formData = new FormData();
+        formData.append('action', 'wcospa_recover_orphaned_orders');
+        formData.append('nonce', wcospaAdmin.nonce);
+        
+        // Make the AJAX request
+        fetch(ajaxurl, {
+            method: 'POST',
+            body: formData,
+            credentials: 'same-origin'
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                recoveryContent.textContent = data.data.recovery_output || 'Recovery completed successfully';
+                const count = data.data.recovered_count || 0;
+                const message = count > 0 
+                    ? `Successfully recovered ${count} orphaned order(s)!` 
+                    : 'No orphaned orders found. All orders are properly tracked.';
+                showMessage('success', message);
+            } else {
+                recoveryContent.textContent = 'Error: ' + (data.data.message || 'Unknown error occurred');
+                showMessage('error', data.data.message || 'Failed to recover orphaned orders');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            recoveryContent.textContent = 'Network error: ' + error.message;
+            showMessage('error', 'Network error occurred');
+        })
+        .finally(() => {
+            // Reset button state
+            button.disabled = false;
+            button.textContent = 'Recover Orphaned Orders';
+        });
+    }
+
     // Function to perform debug actions
     function performDebugAction(actionName, loadingText, outputKey) {
         const button = document.getElementById(actionName.replace('wcospa_', 'wcospa-'));

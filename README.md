@@ -126,6 +126,28 @@ This plugin is licensed under the GPLv2 or later. For more information, see http
 
 ### Changelog
 
+#### 1.6.9
+- **Performance Enhancement:** Increased shipment tracking processing capacity and speed
+  - **Doubled processing capacity**: Increased from 5 to 10 orders per scheduled run
+  - **Faster processing**: Reduced delay between orders from 3 seconds to 1 second
+  - **Improved throughput**: Can now process up to 10 orders in ~10 seconds (vs 5 orders in ~15 seconds previously)
+  - **Better handling of backlogs**: Weekly capacity increased from 90 orders to 180 orders maximum
+  - **Monday-Thursday capacity**: 40 orders per day (4 runs × 10 orders) vs previous 20 orders
+  - **Friday capacity**: 20 orders per day (2 runs × 10 orders) vs previous 10 orders
+  - **API rate compliance**: Still well within 10 calls/second limit (~1 call/second during processing)
+  - All orders still benefit from automatic recovery, retry mechanisms, and comprehensive logging
+
+#### 1.6.8
+- **Critical Fix:** Resolved orphaned shipment tracking issue for orders stuck in "Preparing to Ship" status
+  - **Root cause identified**: Orders missing `_wcospa_shipment_tracking_start` meta key were invisible to scheduled shipment processing
+  - **Automatic recovery system**: Added `recover_orphaned_orders()` function that runs before each scheduled shipment check
+  - **Improved query robustness**: Modified `process_pending_shipments()` to use LEFT JOIN instead of INNER JOIN, finding orders even without tracking start meta
+  - **Safety check implemented**: Added fallback in `scheduled_fetch_pronto_order()` to ensure tracking meta is always set after receiving Pronto order number
+  - **Admin recovery tool**: Added "Recover Orphaned Orders" button in admin interface for manual recovery
+  - **Comprehensive logging**: All recovery actions are logged with order-specific details for troubleshooting
+  - **Prevention mechanism**: Multiple safety checks ensure orders are never orphaned again
+  - Orders that were previously stuck will now be automatically recovered and processed during the next scheduled run
+
 #### 1.6.7
 - **Enhancement:** Added support for additional payment methods
   - **ZIP payment support**: Added `stripe_zip` payment gateway mapping

@@ -167,6 +167,13 @@ class WCOSPA_Order_Handler
             // Trigger shipment tracking process
             do_action('wcospa_pronto_order_number_received', $order_id, $pronto_order_number);
             
+            // Safety check: Ensure tracking start meta exists (in case hook failed)
+            if (!get_post_meta($order_id, '_wcospa_shipment_tracking_start', true)) {
+                update_post_meta($order_id, '_wcospa_shipment_tracking_start', time());
+                update_post_meta($order_id, '_wcospa_shipment_tracking_attempts', 0);
+                WCOSPA_Logger::warning(sprintf('Safety check: Added missing shipment tracking start meta for order %d', $order_id), [], $order_id);
+            }
+            
             // Fetch shipping number
             $order_details = WCOSPA_API_Client::get_pronto_order_details($order_id);
             if (!is_wp_error($order_details)) {

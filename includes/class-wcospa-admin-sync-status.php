@@ -28,6 +28,7 @@ class WCOSPA_Admin_Sync_Status
         add_action('wp_ajax_wcospa_debug_scheduled_events', [__CLASS__, 'handle_debug_scheduled_events']);
         add_action('wp_ajax_wcospa_test_shipment_processing', [__CLASS__, 'handle_test_shipment_processing']);
         add_action('wp_ajax_wcospa_reset_scheduled_events', [__CLASS__, 'handle_reset_scheduled_events']);
+        add_action('wp_ajax_wcospa_recover_orphaned_orders', [__CLASS__, 'handle_recover_orphaned_orders']);
     }
 
     public static function add_sync_status_menu()
@@ -127,6 +128,19 @@ class WCOSPA_Admin_Sync_Status
                 </div>
             </div>
             
+            <div class="wcospa-settings-section">
+                <h2><?php _e('Shipment Tracking Management', 'wcospa'); ?></h2>
+                <p><?php _e('Recover orphaned orders and manage shipment tracking:', 'wcospa'); ?></p>
+                <button id="wcospa-recover-orphaned-orders" class="button button-primary" style="background: #d63638; border-color: #d63638;"><?php _e('Recover Orphaned Orders', 'wcospa'); ?></button>
+                <p class="description" style="margin-top: 5px;">
+                    <?php _e('This will find all "Preparing to Ship" orders with Pronto numbers but missing shipment tracking setup, and add them to the tracking queue.', 'wcospa'); ?>
+                </p>
+                <div id="wcospa-recovery-output" style="margin-top: 15px; padding: 10px; background: #f0f0f0; border-left: 4px solid #d63638; display: none;">
+                    <h4><?php _e('Recovery Output:', 'wcospa'); ?></h4>
+                    <pre id="wcospa-recovery-content"></pre>
+                </div>
+            </div>
+
             <div class="wcospa-settings-section">
                 <h2><?php _e('Scheduled Events Debug', 'wcospa'); ?></h2>
                 <p><?php _e('Debug and test the scheduled shipment tracking system:', 'wcospa'); ?></p>
@@ -392,6 +406,57 @@ class WCOSPA_Admin_Sync_Status
         $reset_output = implode("\n", array_slice($log_entries, -15)); // Get last 15 log entries
         
         wp_send_json_success(['reset_output' => $reset_output]);
+    }
+
+    /**
+     * Handle recover orphaned orders AJAX request
+     */
+    public static function handle_recover_orphaned_orders()
+    {
+        check_ajax_referer('wcospa_admin_nonce', 'nonce');
+        
+        if (!current_user_can('manage_woocommerce')) {
+            wp_send_json_error(['message' => 'Insufficient permissions']);
+        }
+        
+        WCOSPA_Logger::info('Manual recovery of orphaned orders initiated from admin');
+        
+        // Get count before recovery
+        global $wpdb;
+        $before_count = $wpdb->get_var("
+            SELECT COUNT(DISTINCT o.ID)
+            FROM {$wpdb->posts} o
+            JOIN {$wpdb->postmeta} pm1 ON o.ID = pm1.post_id
+            WHERE o.post_type = 'shop_order'
+            AND o.post_status = 'wc-preparing-to-ship'
+            AND pm1.meta_key = '_wcospa_pronto_order_number'
+            AND NOT EXISTS (
+                SELECT 1 FROM {$wpdb->postmeta} pm2
+                WHERE pm2.post_id = o.ID
+                AND pm2.meta_key = '_wcospa_shipment_number'
+            )
+            AND NOT EXISTS (
+                SELECT 1 FROM {$wpdb->postmeta} pm3
+                WHERE pm3.post_id = o.ID
+                AND pm3.meta_key = '_wcospa_shipment_tracking_start'
+            )
+        ");
+        
+        // Run recovery
+        WCOSPA_Shipment_Handler::recover_orphaned_orders();
+        
+        // Get the detailed log output
+        $log_entries = WCOSPA_Logger::get_recent_logs(100);
+        $recovery_output = implode("\n", array_slice($log_entries, -30)); // Get last 30 log entries
+        
+        $message = sprintf('Recovery complete. Found and recovered %d orphaned order(s).', $before_count);
+        WCOSPA_Logger::info($message);
+        
+        wp_send_json_success([
+            'recovery_output' => $recovery_output,
+            'message' => $message,
+            'recovered_count' => $before_count
+        ]);
     }
 }
 
