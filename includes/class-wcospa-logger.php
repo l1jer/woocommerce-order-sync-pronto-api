@@ -78,73 +78,73 @@ class WCOSPA_Logger
     /**
      * Log a debug message
      */
-    public static function debug(string $message, array $context = [], int $order_id = null)
+    public static function debug(string $message, array $context = [], $order_id = null)
     {
-        self::log(self::LEVEL_DEBUG, $message, $context, $order_id);
+        self::log(self::LEVEL_DEBUG, $message, $context, $order_id ? (int) $order_id : null);
     }
 
     /**
      * Log an info message
      */
-    public static function info(string $message, array $context = [], int $order_id = null)
+    public static function info(string $message, array $context = [], $order_id = null)
     {
-        self::log(self::LEVEL_INFO, $message, $context, $order_id);
+        self::log(self::LEVEL_INFO, $message, $context, $order_id ? (int) $order_id : null);
     }
 
     /**
      * Log a warning message
      */
-    public static function warning(string $message, array $context = [], int $order_id = null)
+    public static function warning(string $message, array $context = [], $order_id = null)
     {
-        self::log(self::LEVEL_WARNING, $message, $context, $order_id);
+        self::log(self::LEVEL_WARNING, $message, $context, $order_id ? (int) $order_id : null);
     }
 
     /**
      * Log an error message
      */
-    public static function error(string $message, array $context = [], int $order_id = null)
+    public static function error(string $message, array $context = [], $order_id = null)
     {
-        self::log(self::LEVEL_ERROR, $message, $context, $order_id);
+        self::log(self::LEVEL_ERROR, $message, $context, $order_id ? (int) $order_id : null);
     }
 
     /**
      * Log a critical message
      */
-    public static function critical(string $message, array $context = [], int $order_id = null)
+    public static function critical(string $message, array $context = [], $order_id = null)
     {
-        self::log(self::LEVEL_CRITICAL, $message, $context, $order_id);
+        self::log(self::LEVEL_CRITICAL, $message, $context, $order_id ? (int) $order_id : null);
     }
 
     /**
      * Log a message for a specific order
      */
-    public static function log_order(string $level, int $order_id, string $message, array $context = [])
+    public static function log_order(string $level, $order_id, string $message, array $context = [])
     {
-        self::log($level, $message, $context, $order_id);
+        self::log($level, $message, $context, $order_id ? (int) $order_id : null);
     }
 
     /**
      * Log sync activity for an order
      */
-    public static function log_sync(int $order_id, string $message, array $context = [])
+    public static function log_sync($order_id, string $message, array $context = [])
     {
-        self::log(self::LEVEL_INFO, $message, $context, $order_id);
+        self::log(self::LEVEL_INFO, $message, $context, $order_id ? (int) $order_id : null);
     }
 
     /**
      * Log shipment activity for an order
      */
-    public static function log_shipment(int $order_id, string $message, array $context = [])
+    public static function log_shipment($order_id, string $message, array $context = [])
     {
-        self::log(self::LEVEL_INFO, $message, $context, $order_id);
+        self::log(self::LEVEL_INFO, $message, $context, $order_id ? (int) $order_id : null);
     }
 
     /**
      * Log error for a specific order
      */
-    public static function log_order_error(int $order_id, string $message, array $context = [])
+    public static function log_order_error($order_id, string $message, array $context = [])
     {
-        self::log(self::LEVEL_ERROR, $message, $context, $order_id);
+        self::log(self::LEVEL_ERROR, $message, $context, $order_id ? (int) $order_id : null);
     }
 
     /**

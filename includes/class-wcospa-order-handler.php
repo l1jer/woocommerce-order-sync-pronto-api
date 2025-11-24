@@ -29,6 +29,11 @@ class WCOSPA_Order_Handler
         add_action('woocommerce_order_status_processing', [__CLASS__, 'handle_order_sync'], 10, 1);
         add_action('wcospa_fetch_pronto_order_number', [__CLASS__, 'scheduled_fetch_pronto_order'], 10, 2);
         add_action('wcospa_process_pending_orders', [__CLASS__, 'process_pending_orders'], 10);
+        
+        // Payment failure/cancellation detection hooks
+        add_action('woocommerce_order_status_failed', [__CLASS__, 'handle_order_payment_failed'], 10, 1);
+        add_action('woocommerce_order_status_cancelled', [__CLASS__, 'handle_order_cancelled'], 10, 1);
+        
         // Schedule recurring event for processing pending orders
         if (!wp_next_scheduled('wcospa_process_pending_orders')) {
             wp_schedule_event(time(), 'every_three_seconds', 'wcospa_process_pending_orders');
@@ -97,12 +102,38 @@ class WCOSPA_Order_Handler
      */
     public static function handle_order_sync($order_id)
     {
+        $order = wc_get_order($order_id);
+        
+        if (!$order) {
+            WCOSPA_Logger::error(sprintf('Order %d not found', $order_id), [], $order_id);
+            return;
+        }
+        
+        // Payment verification check - prevent syncing orders without confirmed payment
+        if (!$order->is_paid()) {
+            WCOSPA_Logger::warning(
+                sprintf('Order %d status is processing but payment not confirmed (is_paid=false). Skipping sync to prevent issues.', $order_id),
+                [],
+                $order_id
+            );
+            return;
+        }
+        
+        // Additional safety check for problematic statuses (race condition protection)
+        if (in_array($order->get_status(), ['failed', 'on-hold', 'cancelled', 'refunded'])) {
+            WCOSPA_Logger::warning(
+                sprintf('Order %d has status "%s". Skipping sync.', $order_id, $order->get_status()),
+                [],
+                $order_id
+            );
+            return;
+        }
+        
         $response = WCOSPA_API_Client::sync_order($order_id);
 
         if (is_wp_error($response)) {
             WCOSPA_Logger::log_order_error($order_id, sprintf('Order sync failed: %s', $response->get_error_message()));
         } else {
-            $order = wc_get_order($order_id);
             $order->update_status('wc-preparing-to-ship', 'Order marked as Preparing to Ship after successful API sync.');
             
             // Store transaction UUID and sync time
@@ -112,6 +143,160 @@ class WCOSPA_Order_Handler
             
             // Schedule the first fetch attempt
             wp_schedule_single_event(time() + self::INITIAL_WAIT, 'wcospa_fetch_pronto_order_number', [$order_id, 1]);
+        }
+    }
+
+    /**
+     * Handle order payment failure - send email if order was already synced to Pronto
+     */
+    public static function handle_order_payment_failed($order_id)
+    {
+        $transaction_uuid = get_post_meta($order_id, '_wcospa_transaction_uuid', true);
+        $pronto_order_number = get_post_meta($order_id, '_wcospa_pronto_order_number', true);
+        
+        // Only alert if order was already synced to Pronto
+        if ($transaction_uuid) {
+            WCOSPA_Logger::error(
+                sprintf('PAYMENT FAILED: Order %d was synced to Pronto but payment has failed. Email notification sent.', $order_id),
+                [],
+                $order_id
+            );
+            
+            self::send_payment_failure_email($order_id, $pronto_order_number, 'failed');
+        }
+    }
+    
+    /**
+     * Handle order cancellation - send email if order was already synced to Pronto
+     */
+    public static function handle_order_cancelled($order_id)
+    {
+        $transaction_uuid = get_post_meta($order_id, '_wcospa_transaction_uuid', true);
+        $pronto_order_number = get_post_meta($order_id, '_wcospa_pronto_order_number', true);
+        
+        // Only alert if order was already synced to Pronto
+        if ($transaction_uuid) {
+            WCOSPA_Logger::error(
+                sprintf('ORDER CANCELLED: Order %d was synced to Pronto but has been cancelled. Email notification sent.', $order_id),
+                [],
+                $order_id
+            );
+            
+            self::send_payment_failure_email($order_id, $pronto_order_number, 'cancelled');
+        }
+    }
+    
+    /**
+     * Send email notification for payment failures on synced orders
+     */
+    private static function send_payment_failure_email($order_id, $pronto_order_number, $reason)
+    {
+        $order = wc_get_order($order_id);
+        
+        if (!$order) {
+            return;
+        }
+        
+        // Email recipients
+        $to = [
+            'sales@tsaoutdoors.com.au',
+            'warehouse@tsaoutdoors.com.au',
+            'mj@tsaoutdoors.com.au',
+            'jli@tsaoutdoors.com.au',
+            'dschacht@tsaoutdoors.com.au',
+        ];
+        
+        // Email subject
+        $subject = sprintf(
+            '[Alert] Order %s Payment %s - Pronto Sync Requires Manual Review',
+            $order->get_order_number(),
+            $reason === 'failed' ? 'Failed' : 'Cancelled'
+        );
+        
+        // Get site information
+        $site_name = get_bloginfo('name');
+        $site_url = get_site_url();
+        
+        // Build email body
+        $message = "Order Payment Issue Alert\n";
+        $message .= str_repeat('=', 50) . "\n\n";
+        $message .= sprintf("An order was synced to Pronto but payment has %s.\n", $reason === 'failed' ? 'FAILED' : 'been CANCELLED');
+        $message .= "Manual review and action required in Pronto.\n\n";
+        
+        $message .= "ORDER DETAILS:\n";
+        $message .= str_repeat('-', 50) . "\n";
+        $message .= sprintf("Website: %s\n", $site_name);
+        $message .= sprintf("Site URL: %s\n", $site_url);
+        $message .= sprintf("WooCommerce Order #: %s\n", $order->get_order_number());
+        $message .= sprintf("Order ID: %d\n", $order_id);
+        $message .= sprintf("Order Status: %s\n", ucfirst($order->get_status()));
+        $message .= sprintf("Order Date: %s\n", $order->get_date_created()->date('Y-m-d H:i:s'));
+        $message .= sprintf("Order Total: %s\n", $order->get_formatted_order_total());
+        $message .= "\n";
+        
+        $message .= "PRONTO SYNC DETAILS:\n";
+        $message .= str_repeat('-', 50) . "\n";
+        if ($pronto_order_number) {
+            $message .= sprintf("Pronto Order Number: %s\n", $pronto_order_number);
+        } else {
+            $message .= "Pronto Order Number: Not yet retrieved (sync in progress)\n";
+        }
+        $message .= sprintf("Transaction UUID: %s\n", get_post_meta($order_id, '_wcospa_transaction_uuid', true));
+        $message .= sprintf("Sync Time: %s\n", date('Y-m-d H:i:s', get_post_meta($order_id, '_wcospa_sync_time', true)));
+        $message .= "\n";
+        
+        $message .= "CUSTOMER DETAILS:\n";
+        $message .= str_repeat('-', 50) . "\n";
+        $message .= sprintf("Name: %s %s\n", $order->get_billing_first_name(), $order->get_billing_last_name());
+        $message .= sprintf("Email: %s\n", $order->get_billing_email());
+        $message .= sprintf("Phone: %s\n", $order->get_billing_phone());
+        $message .= "\n";
+        
+        $message .= "PAYMENT DETAILS:\n";
+        $message .= str_repeat('-', 50) . "\n";
+        $message .= sprintf("Payment Method: %s\n", $order->get_payment_method_title());
+        $message .= sprintf("Transaction ID: %s\n", $order->get_transaction_id() ?: 'N/A');
+        $message .= "\n";
+        
+        $message .= "REQUIRED ACTION:\n";
+        $message .= str_repeat('-', 50) . "\n";
+        if ($pronto_order_number) {
+            $message .= sprintf("1. Locate Pronto Order #%s\n", $pronto_order_number);
+            $message .= "2. Cancel or delete the order in Pronto\n";
+            $message .= "3. Verify inventory has been returned to stock\n";
+        } else {
+            $message .= "1. Monitor for Pronto order number creation\n";
+            $message .= "2. Cancel order in Pronto once number is assigned\n";
+            $message .= "3. Verify inventory has been returned to stock\n";
+        }
+        $message .= "\n";
+        
+        $message .= sprintf("View Order in Admin: %s\n", admin_url('post.php?post=' . $order_id . '&action=edit'));
+        $message .= "\n";
+        $message .= str_repeat('=', 50) . "\n";
+        $message .= "This is an automated notification from WooCommerce Order Sync Pronto API plugin.\n";
+        
+        // Email headers
+        $headers = [
+            'From: ' . get_bloginfo('name') . ' <' . get_option('admin_email') . '>',
+            'Content-Type: text/plain; charset=UTF-8'
+        ];
+        
+        // Send email
+        $sent = wp_mail($to, $subject, $message, $headers);
+        
+        if ($sent) {
+            WCOSPA_Logger::info(
+                sprintf('Payment failure email sent for order %d to: %s', $order_id, implode(', ', $to)),
+                [],
+                $order_id
+            );
+        } else {
+            WCOSPA_Logger::error(
+                sprintf('Failed to send payment failure email for order %d', $order_id),
+                [],
+                $order_id
+            );
         }
     }
 
@@ -451,9 +636,9 @@ class WCOSPA_Order_Sync_Button
                         ['source' => 'wcospa']
                     );
                     wp_send_json_error('Server error occurred. Please try again later.');
-                } else {
-                    wc_get_logger()->debug($result['message'], ['source' => 'wcospa']);
-                    wp_send_json_error($result['message']);
+            } else {
+                wc_get_logger()->debug($result['message'], ['source' => 'wcospa']);
+                wp_send_json_error($result['message']);
                 }
             }
         } finally {

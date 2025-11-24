@@ -126,6 +126,17 @@ This plugin is licensed under the GPLv2 or later. For more information, see http
 
 ### Changelog
 
+#### 1.6.10
+- **Critical Fix:** Payment verification and failure detection to prevent syncing orders with failed payments
+  - **Payment verification added**: Orders must pass `is_paid()` check before syncing to Pronto
+  - **Race condition protection**: Additional status checks prevent syncing orders in failed/on-hold/cancelled/refunded states
+  - **Payment failure detection**: Automatic detection when orders are cancelled or fail after being synced
+  - **Email notifications**: Sends alerts to sales@tsaoutdoors.com.au, warehouse@tsaoutdoors.com.au, mj@tsaoutdoors.com.au, and jli@tsaoutdoors.com.au
+  - **Comprehensive email details**: Includes WooCommerce order number, Pronto order number, customer details, payment info, and required actions
+  - **Smart notifications**: Only sends emails if order was actually synced to Pronto (prevents false alerts)
+  - **Complete logging**: All payment verification failures and cancellations logged with order context
+  - Prevents Stripe 3D Secure failures, fraud detection holds, and authorization/capture mismatches from creating orphaned Pronto orders
+
 #### 1.6.9b
 - **Fix:** Improved API response logging quality and completeness
   - Replaced `print_r()` with `wp_json_encode()` for structured logging
@@ -193,6 +204,15 @@ This plugin is licensed under the GPLv2 or later. For more information, see http
   - **Added manual testing capabilities**: Admin can now manually trigger shipment processing and view real-time results
   - **Enhanced shipment tracking schedule**: Monday-Thursday at 9:00 AM, 12:00 PM, 2:00 PM, 5:30 PM; Friday at 9:00 AM, 12:00 PM (Sydney time)
   - **Fixed WordPress cron integration**: Proper cleanup and registration of scheduled events to prevent conflicts
+
+#### 1.6.10a
+- **Bug Fix:** Fixed TypeError in logger when order IDs are passed as strings
+  - **Issue**: `WCOSPA_Logger` methods were strictly type-hinted to accept `int` for `$order_id` parameter, but some WordPress contexts pass order IDs as strings (e.g., from queue handlers, AJAX requests)
+  - **Error**: `TypeError: WCOSPA_Logger::debug(): Argument #3 ($order_id) must be of type ?int, string given`
+  - **Solution**: Added automatic type casting `(int)` in all public logging methods to handle both string and integer order IDs
+  - **Methods updated**: `debug()`, `info()`, `warning()`, `error()`, `critical()`, `log_order()`, `log_sync()`, `log_shipment()`, `log_order_error()`
+  - **Impact**: Resolves fatal errors during scheduled shipment tracking, queue processing, and AJAX operations
+  - **Compatibility**: Maintains strict typing on internal `log()` method while providing flexible input on public methods
 
 #### 1.6.6a
 - **Critical Fix:** Corrected incorrect implementation of shipment tracking schedule times
