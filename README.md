@@ -37,7 +37,7 @@ The plugin operates with the following configured time intervals:
 - Retry Interval: 30 seconds between retry attempts
 - Request Delay: 3 seconds between different orders
 - Maximum Retry Count: 5 attempts
-- Cron Job Interval: Every 60 seconds for pending orders processing
+- Pending Order Cron: Legacy 3-second/60-second cron removed in 1.6.10b; processing now relies on per-order single events scheduled during sync
 
 #### Order Status Management
 
@@ -91,7 +91,7 @@ The plugin responds to these WordPress hooks:
 
 - `woocommerce_order_status_processing`: Triggers order synchronisation
 - `wcospa_fetch_pronto_order_number`: Initiates Pronto order number fetch
-- `wcospa_process_pending_orders`: Processes pending order queue
+- `wcospa_process_pending_orders`: Legacy fallback hook retained for manual invocation (automatic 3-second cron removed in 1.6.10b)
 - `wcospa_pronto_order_number_received`: Handles successful order number receipt
 
 The plugin introduces a custom order status:
@@ -125,6 +125,14 @@ The plugin introduces a custom order status:
 This plugin is licensed under the GPLv2 or later. For more information, see https://www.gnu.org/licenses/gpl-2.0.html.
 
 ### Changelog
+
+#### 1.6.10b
+- **Performance Fix:** Removed legacy 3-second cron job that repeatedly hit `wcospa_process_pending_orders`
+  - Eliminated `every_three_seconds` cron schedule and associated custom interval registration
+  - Added automatic cleanup that clears the legacy schedule on init and activation, preventing future CPU spikes
+  - Pending orders now rely solely on per-order single events created during sync (no recurring polling)
+  - Significantly reduces server load (28,800 daily executions removed) while keeping retry safeguards
+  - Documentation updated to reflect the removal of the cron-based queue
 
 #### 1.6.10
 - **Critical Fix:** Payment verification and failure detection to prevent syncing orders with failed payments

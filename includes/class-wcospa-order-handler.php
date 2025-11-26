@@ -29,15 +29,11 @@ class WCOSPA_Order_Handler
         add_action('woocommerce_order_status_processing', [__CLASS__, 'handle_order_sync'], 10, 1);
         add_action('wcospa_fetch_pronto_order_number', [__CLASS__, 'scheduled_fetch_pronto_order'], 10, 2);
         add_action('wcospa_process_pending_orders', [__CLASS__, 'process_pending_orders'], 10);
+        self::clear_legacy_pending_orders_schedule();
         
         // Payment failure/cancellation detection hooks
         add_action('woocommerce_order_status_failed', [__CLASS__, 'handle_order_payment_failed'], 10, 1);
         add_action('woocommerce_order_status_cancelled', [__CLASS__, 'handle_order_cancelled'], 10, 1);
-        
-        // Schedule recurring event for processing pending orders
-        if (!wp_next_scheduled('wcospa_process_pending_orders')) {
-            wp_schedule_event(time(), 'every_three_seconds', 'wcospa_process_pending_orders');
-        }
     }
 
     /**
@@ -73,12 +69,7 @@ class WCOSPA_Order_Handler
         update_option('wcospa_current_activation_time', time(), 'no');
 
         // Clear any existing scheduled hooks
-        wp_clear_scheduled_hook('wcospa_process_pending_orders');
-        
-        // Schedule the recurring event
-        if (!wp_next_scheduled('wcospa_process_pending_orders')) {
-            wp_schedule_event(time(), 'every_three_seconds', 'wcospa_process_pending_orders');
-        }
+        self::clear_legacy_pending_orders_schedule();
     }
 
     /**
@@ -93,6 +84,17 @@ class WCOSPA_Order_Handler
         delete_option('wcospa_current_activation_time');
         
         // Do NOT remove wcospa_first_activation_time to maintain historical reference
+    }
+
+    /**
+     * Remove legacy 3-second cron schedules to prevent high CPU usage
+     */
+    private static function clear_legacy_pending_orders_schedule(): void
+    {
+        if (wp_next_scheduled('wcospa_process_pending_orders')) {
+            wp_clear_scheduled_hook('wcospa_process_pending_orders');
+            WCOSPA_Logger::info('Cleared legacy 3-second pending orders cron job');
+        }
     }
 
     /**
@@ -1277,21 +1279,6 @@ function wc_custom_order_status_styles()
     </style>';
 }
 add_action('admin_head', 'wc_custom_order_status_styles');
-
-// Register custom cron interval
-function register_three_second_interval($schedules)
-{
-    $schedules['every_three_seconds'] = array(
-        'interval' => 3,
-        'display' => __('Every Three Seconds')
-    );
-    $schedules['every_three_minutes'] = array(
-        'interval' => 180,
-        'display' => __('Every Three Minutes')
-    );
-    return $schedules;
-}
-add_filter('cron_schedules', 'register_three_second_interval');
 
 class WCOSPA_Bulk_Shipment_Handler
 {
