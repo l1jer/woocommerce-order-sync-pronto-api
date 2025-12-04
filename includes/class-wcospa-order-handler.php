@@ -1190,10 +1190,10 @@ class WCOSPA_Order_Data_Formatter
                 $description = 'AfterPay';
                 break;
             case 'stripe_zip':
-                $description = 'ZIP';
+                $description = 'Stripe - ZIP';
                 break;
             case 'stripe_applepay':
-                $description = 'Apple Pay';
+                $description = 'Stripe - Apple Pay';
                 break;
         }
 
