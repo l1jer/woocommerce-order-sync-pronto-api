@@ -69,3 +69,4 @@ phpunit.xml
 
 # WooCommerce specific
 wc-logs/
+条件触发.md

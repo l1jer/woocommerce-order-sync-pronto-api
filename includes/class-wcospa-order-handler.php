@@ -825,15 +825,6 @@ class WCOSPA_Bulk_Sync_Handler
                 update_post_meta($order_id, '_wcospa_sync_time', time());
                 update_post_meta($order_id, '_wcospa_fetch_retry_count', 0);
                 
-                // Mark as weekend order if applicable
-                if (WCOSPA_Utils::is_weekend()) {
-                    update_post_meta($order_id, '_wcospa_weekend_order', '1');
-                    wc_get_logger()->info(
-                        sprintf('Order %d marked as weekend order', $order_id),
-                        ['source' => 'wcospa']
-                    );
-                }
-                
                 // Schedule the first fetch attempt (same as individual sync)
                 wp_schedule_single_event(time() + WCOSPA_Order_Handler::INITIAL_WAIT, 'wcospa_fetch_pronto_order_number', [$order_id, 1]);
                 
@@ -1282,8 +1273,8 @@ add_action('admin_head', 'wc_custom_order_status_styles');
 
 class WCOSPA_Bulk_Shipment_Handler
 {
-    const CHUNK_SIZE = 2; // Process 2 orders per batch
-    const BATCH_DELAY = 1; // 1 second delay between batches
+    const CHUNK_SIZE = 1; // Process 1 order per request to avoid skipping on a shrinking eligible set
+    const BATCH_DELAY = 1; // Kept for backwards compatibility; batching is now request-driven
     
     public static function init()
     {
@@ -1309,7 +1300,7 @@ class WCOSPA_Bulk_Shipment_Handler
         
         if ($eligible_count > 0) {
             echo '<div class="alignleft actions">';
-            echo '<button type="button" id="wcospa-bulk-shipment" class="button" data-nonce="' . wp_create_nonce('wcospa_bulk_shipment_nonce') . '">';
+            echo '<button type="button" id="wcospa-bulk-shipment" class="button" data-eligible-count="' . (int) $eligible_count . '" data-nonce="' . wp_create_nonce('wcospa_bulk_shipment_nonce') . '">';
             echo sprintf(__('Obtain Shipping Number (%d orders)', 'wcospa'), $eligible_count);
             echo '</button>';
             echo '</div>';
@@ -1363,6 +1354,55 @@ class WCOSPA_Bulk_Shipment_Handler
     }
 
     /**
+     * Get the next eligible order after a given order ID.
+     *
+     * @param int $after_order_id The last processed order ID.
+     * @return object|null
+     */
+    private static function get_next_eligible_order(int $after_order_id): ?object
+    {
+        global $wpdb;
+
+        $sql = $wpdb->prepare(
+            "
+            SELECT o.ID as order_id, pm1.meta_value as pronto_order_number
+            FROM {$wpdb->posts} o
+            JOIN {$wpdb->postmeta} pm1
+                ON o.ID = pm1.post_id
+                AND pm1.meta_key = %s
+            LEFT JOIN {$wpdb->postmeta} pm2
+                ON o.ID = pm2.post_id
+                AND pm2.meta_key = %s
+            WHERE o.post_type = %s
+                AND o.post_status = %s
+                AND (pm2.meta_value IS NULL OR pm2.meta_value = '')
+                AND o.ID > %d
+            ORDER BY o.ID ASC
+            LIMIT 1
+            ",
+            '_wcospa_pronto_order_number',
+            '_wcospa_shipment_number',
+            'shop_order',
+            'wc-preparing-to-ship',
+            $after_order_id
+        );
+
+        $row = $wpdb->get_row($sql);
+        return $row ?: null;
+    }
+
+    /**
+     * Check if there is another eligible order after a given order ID.
+     *
+     * @param int $after_order_id The last processed order ID.
+     * @return bool
+     */
+    private static function has_next_eligible_order(int $after_order_id): bool
+    {
+        return (bool) self::get_next_eligible_order($after_order_id);
+    }
+
+    /**
      * Handle bulk shipment AJAX request
      */
     public static function handle_bulk_shipment_request()
@@ -1373,113 +1413,94 @@ class WCOSPA_Bulk_Shipment_Handler
             wp_send_json_error('Insufficient permissions');
         }
 
-        $chunk = isset($_POST['chunk']) ? (int) $_POST['chunk'] : 0;
-        $offset = $chunk * self::CHUNK_SIZE;
-        
-        // Get eligible orders for this chunk
-        $eligible_orders = self::get_eligible_orders(self::CHUNK_SIZE . " OFFSET {$offset}");
-        
-        if (empty($eligible_orders)) {
+        $after_order_id = isset($_POST['after_order_id']) ? (int) $_POST['after_order_id'] : 0;
+
+        WCOSPA_Logger::debug(
+            sprintf('Bulk shipment request received (after_order_id: %d)', $after_order_id)
+        );
+
+        $next_order = self::get_next_eligible_order($after_order_id);
+
+        if (!$next_order) {
             wp_send_json_success([
                 'status' => 'complete',
                 'message' => 'No more orders to process'
             ]);
         }
 
-        $results = [];
-        $start_time = microtime(true);
+        $order_id = (int) $next_order->order_id;
+        $pronto_order_number = (string) $next_order->pronto_order_number;
 
-        // Process each order in the chunk
-        foreach ($eligible_orders as $order_data) {
-            $order_id = (int) $order_data->order_id;
-            $pronto_order_number = $order_data->pronto_order_number;
-            
-            $order_start_time = microtime(true);
-            
-            // Use existing shipment handler function
-            $result = WCOSPA_Shipment_Handler::fetch_shipment_number($order_id, 'bulk');
-            
-            $processing_time = round((microtime(true) - $order_start_time) * 1000, 2); // milliseconds
-            
-            // Handle timeout errors specifically
-            $status = 'error';
-            $message = $result['message'] ?? 'Processed successfully';
-            
-            if ($result['success']) {
-                $status = 'success';
-            } elseif (isset($result['error_type'])) {
-                if ($result['error_type'] === 'timeout') {
-                    $status = 'timeout';
-                    $message = 'Request timed out (524 error)';
-                    
-                                         // Log timeout error specifically
-                     WCOSPA_Logger::log_order_error(
-                         $order_id,
-                         sprintf('Bulk shipment fetch timed out: %s (%.2fms)',
-                             $result['message'],
-                             $processing_time
-                         )
-                     );
-                } elseif ($result['error_type'] === 'server_error') {
-                    $status = 'server_error';
-                    $message = 'Server error occurred';
-                    
-                                         // Log server error specifically
-                     WCOSPA_Logger::log_order_error(
-                         $order_id,
-                         sprintf('Bulk shipment fetch server error: %s (%.2fms)',
-                             $result['message'],
-                             $processing_time
-                         )
-                     );
-                }
-            }
-            
-            $results[] = [
-                'order_id' => $order_id,
-                'pronto_order_number' => $pronto_order_number,
-                'status' => $status,
-                'shipment_number' => $result['shipment_number'] ?? null,
-                'message' => $message,
-                'processing_time' => $processing_time,
-                'status_code' => $result['status_code'] ?? null,
-                'error_type' => $result['error_type'] ?? null,
-                'error_code' => $result['error_code'] ?? null
-            ];
+        $order_start_time = microtime(true);
+        $result = WCOSPA_Shipment_Handler::fetch_shipment_number($order_id, 'bulk');
+        $processing_time = round((microtime(true) - $order_start_time) * 1000, 2); // milliseconds
 
-            // Log the result
-            WCOSPA_Logger::info(
-                sprintf('Bulk shipment processing: %s - %s (%.2fms)',
-                    strtoupper($status),
-                    $message,
-                    $processing_time
-                ),
-                [],
-                $order_id
-            );
-            
-            // Add a small delay between requests to respect API rate limits and reduce server load
-            if (count($results) < count($eligible_orders)) {
-                usleep(200000); // 200ms delay between requests
+        // Handle timeout errors specifically
+        $status = 'error';
+        $message = $result['message'] ?? 'Processed successfully';
+
+        if (!empty($result['success'])) {
+            $status = 'success';
+        } elseif (isset($result['error_type'])) {
+            if ($result['error_type'] === 'timeout') {
+                $status = 'timeout';
+                $message = 'Request timed out (524 error)';
+
+                WCOSPA_Logger::log_order_error(
+                    $order_id,
+                    sprintf(
+                        'Bulk shipment fetch timed out: %s (%.2fms)',
+                        $result['message'],
+                        $processing_time
+                    )
+                );
+            } elseif ($result['error_type'] === 'server_error') {
+                $status = 'server_error';
+                $message = 'Server error occurred';
+
+                WCOSPA_Logger::log_order_error(
+                    $order_id,
+                    sprintf(
+                        'Bulk shipment fetch server error: %s (%.2fms)',
+                        $result['message'],
+                        $processing_time
+                    )
+                );
             }
         }
 
-        $total_processing_time = round((microtime(true) - $start_time) * 1000, 2); // milliseconds
-        
-        // Check if there are more orders to process
-        $total_eligible = self::get_eligible_orders_count();
-        $processed_so_far = ($chunk + 1) * self::CHUNK_SIZE;
-        $has_more = $processed_so_far < $total_eligible;
+        $response_result = [
+            'order_id' => $order_id,
+            'pronto_order_number' => $pronto_order_number,
+            'status' => $status,
+            'shipment_number' => $result['shipment_number'] ?? null,
+            'message' => $message,
+            'processing_time' => $processing_time,
+            'status_code' => $result['status_code'] ?? null,
+            'error_type' => $result['error_type'] ?? null,
+            'error_code' => $result['error_code'] ?? null
+        ];
+
+        WCOSPA_Logger::info(
+            sprintf(
+                'Bulk shipment processing: %s - %s (%.2fms)',
+                strtoupper($status),
+                $message,
+                $processing_time
+            ),
+            [],
+            $order_id
+        );
+
+        $has_more = self::has_next_eligible_order($order_id);
 
         wp_send_json_success([
-            'status' => $has_more ? 'chunk_complete' : 'complete',
-            'chunk' => $chunk,
-            'results' => $results,
-            'processed_so_far' => $processed_so_far,
-            'total_eligible' => $total_eligible,
-            'chunk_processing_time' => $total_processing_time,
+            'status' => $has_more ? 'order_complete' : 'complete',
+            'result' => $response_result,
+            'order_processing_time' => $processing_time,
+            'after_order_id' => $order_id,
             'has_more' => $has_more,
-            'next_chunk' => $has_more ? $chunk + 1 : null
+            'next_after_order_id' => $has_more ? $order_id : null
         ]);
     }
 

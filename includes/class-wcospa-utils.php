@@ -43,29 +43,11 @@ class WCOSPA_Utils
     }
 
     /**
-     * Check if current time matches shipment check schedule
-     */
-    public static function is_shipment_check_time(): bool
-    {
-        $sydney_time = self::get_sydney_time();
-        $hour = (int) date('G', (int) $sydney_time);
-        $minute = (int) date('i', (int) $sydney_time);
-
-        return ($hour === 11 && $minute === 25) || 
-               ($hour === 16 && $minute === 55);
-    }
-
-    /**
      * Start queue processing loop
      */
     public static function start_queue_processing() {
         // Process order number queue
         WCOSPA_Queue_Handler::process_order_number_queue();
-
-        // Check if it's time for shipment processing
-        if (self::is_shipment_check_time()) {
-            WCOSPA_Queue_Handler::process_shipment_queue();
-        }
     }
 
 

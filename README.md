@@ -126,6 +126,16 @@ This plugin is licensed under the GPLv2 or later. For more information, see http
 
 ### Changelog
 
+#### 1.6.10c
+- **Reliability Fix:** Bulk "Obtain Shipping Number" no longer skips eligible orders
+  - Switched bulk shipment processing to sequential processing (one order per request) with stable "next eligible order" selection
+- **Simplification:** Removed weekend marker logic and legacy shipment queue gating
+  - Removed weekend-related marker logic from bulk sync
+  - Removed legacy shipment queue time gate (`WCOSPA_Utils::is_shipment_check_time()` and related shipment queue path) so shipment processing follows `WCOSPA_Shipment_Handler` scheduled events and manual buttons only
+- **Behaviour Change:** Removed per-order shipment retry throttle
+  - Removed the per-order 1-hour shipment retry throttle (`WCOSPA_Shipment_Handler::RETRY_INTERVAL = 3600` and `_wcospa_last_tracking_attempt`) so scheduled shipment runs always attempt eligible orders
+- **Docs:** Updated `条件触发.md` to reflect the above changes
+
 #### 1.6.10b
 - **Performance Fix:** Removed legacy 3-second cron job that repeatedly hit `wcospa_process_pending_orders`
   - Eliminated `every_three_seconds` cron schedule and associated custom interval registration

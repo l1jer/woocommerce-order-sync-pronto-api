@@ -79,42 +79,8 @@ class WCOSPA_Queue_Handler {
     }
 
     /**
-     * Process queue for shipment number fetching
+     * Legacy method retained from older versions. This class is now used only for Pronto order number queueing.
      */
-    public static function process_shipment_queue() {
-        // Check if enough time has passed since last process
-        if (time() - self::$last_process_time < self::QUEUE_PROCESS_INTERVAL) {
-            return;
-        }
-
-        global $wpdb;
-
-        // Get orders from the last 72 hours without shipment numbers
-        $next_order = $wpdb->get_row(
-            $wpdb->prepare(
-                "SELECT o.ID as order_id
-                FROM {$wpdb->posts} o
-                JOIN {$wpdb->postmeta} pm1 ON o.ID = pm1.post_id
-                WHERE o.post_type = 'shop_order'
-                AND o.post_date >= %s
-                AND pm1.meta_key = '_wcospa_pronto_order_number'
-                AND NOT EXISTS (
-                    SELECT 1 FROM {$wpdb->postmeta} pm2
-                    WHERE pm2.post_id = o.ID
-                    AND pm2.meta_key = '_wcospa_shipment_number'
-                )
-                ORDER BY o.ID ASC
-                LIMIT 1",
-                date('Y-m-d H:i:s', strtotime('-72 hours', strtotime(WCOSPA_Utils::get_sydney_time('Y-m-d H:i:s'))))
-            )
-        );
-
-        if ($next_order) {
-            WCOSPA_Shipment_Handler::fetch_shipment_number($next_order->order_id);
-            self::$last_process_time = time();
-        }
-    }
-
     public function process_queue() {
         // Get orders that need processing
         $orders = $this->get_orders_to_process();

@@ -7,8 +7,6 @@ declare(strict_types=1);
  */
 class WCOSPA_Shipment_Handler
 {
-    const RETRY_INTERVAL = 3600; // 1 hour in seconds
-
     /**
      * Initialise the shipment handler
      */
@@ -295,16 +293,9 @@ class WCOSPA_Shipment_Handler
             
             // Get current attempt count
             $attempts = (int) get_post_meta($order_id, '_wcospa_shipment_tracking_attempts', true);
-            $last_attempt = (int) get_post_meta($order_id, '_wcospa_last_tracking_attempt', true);
 
-            // Check if we need to wait before next attempt
-            if ($last_attempt && (time() - $last_attempt) < self::RETRY_INTERVAL) {
-                continue;
-            }
-
-            // Update attempt count and time
+            // Update attempt count
             update_post_meta($order_id, '_wcospa_shipment_tracking_attempts', $attempts + 1);
-            update_post_meta($order_id, '_wcospa_last_tracking_attempt', time());
 
             // Try to get shipment number
             WCOSPA_Logger::info(sprintf('Processing order %d for shipment tracking (attempt %d)', $order_id, $attempts + 1), [], $order_id);
@@ -407,7 +398,6 @@ class WCOSPA_Shipment_Handler
                             if ($context === 'cron') {
                                 delete_post_meta($order_id, '_wcospa_shipment_tracking_start');
                                 delete_post_meta($order_id, '_wcospa_shipment_tracking_attempts');
-                                delete_post_meta($order_id, '_wcospa_last_tracking_attempt');
                             }
 
                             // Log successful tracking addition with context

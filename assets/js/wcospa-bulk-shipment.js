@@ -3,7 +3,9 @@ jQuery(document).ready(function($) {
 
     // Global variables for tracking progress
     let isProcessing = false;
-    let currentChunk = 0;
+    let afterOrderId = 0;
+    let processedCount = 0;
+    let totalEligible = 0;
     let totalResults = [];
     let progressModal = null;
 
@@ -17,38 +19,41 @@ jQuery(document).ready(function($) {
 
         // Reset variables
         isProcessing = true;
-        currentChunk = 0;
+        afterOrderId = 0;
+        processedCount = 0;
+        totalEligible = parseInt($(this).data('eligible-count'), 10) || 0;
         totalResults = [];
         
         // Show progress modal
         showProgressModal();
         
         // Start processing
-        processNextChunk();
+        processNextOrder();
     });
 
     /**
-     * Process the next chunk of orders
+     * Process the next eligible order (one order per request)
      */
-    function processNextChunk() {
+    function processNextOrder() {
         if (!isProcessing) {
             return;
         }
 
         // Update progress display
         updateProgressDisplay();
+        updateProgressBar(processedCount, totalEligible);
 
         $.ajax({
             url: wcospaBulkShipment.ajaxurl,
             type: 'POST',
             data: {
                 action: 'wcospa_bulk_shipment',
-                chunk: currentChunk,
+                after_order_id: afterOrderId,
                 nonce: wcospaBulkShipment.nonce
             },
             success: function(response) {
                 if (response.success) {
-                    handleChunkResponse(response.data);
+                    handleOrderResponse(response.data);
                 } else {
                     handleError(response.data || wcospaBulkShipment.strings.error);
                 }
@@ -60,29 +65,50 @@ jQuery(document).ready(function($) {
     }
 
     /**
-     * Handle chunk response
+     * Handle single-order response
      */
-    function handleChunkResponse(data) {
-        // Add results to total
-        totalResults = totalResults.concat(data.results);
+    function handleOrderResponse(data) {
+        if (!data) {
+            handleError('Invalid response from server');
+            return;
+        }
+
+        // If orders became ineligible between page load and click, backend may complete with no result.
+        if (data.status === 'complete' && !data.result) {
+            showFinalSummary();
+            return;
+        }
+
+        if (!data.result) {
+            handleError('Invalid response from server');
+            return;
+        }
+
+        // Track results
+        totalResults.push(data.result);
+        processedCount++;
         
         // Update progress
-        updateProgressBar(data.processed_so_far, data.total_eligible);
+        updateProgressBar(processedCount, totalEligible);
+
+        // Show individual result
+        showChunkResults([data.result], data.order_processing_time || 0);
         
-        // Show individual results for this chunk
-        showChunkResults(data.results, data.chunk_processing_time);
+        // Prepare for next request
+        afterOrderId = parseInt(data.after_order_id, 10) || afterOrderId;
         
         if (data.status === 'complete') {
-            // All done
             showFinalSummary();
-        } else if (data.has_more) {
-            // Continue with next chunk after delay
-            currentChunk = data.next_chunk;
-            setTimeout(processNextChunk, 1000); // 1 second delay between chunks
-        } else {
-            // Unexpected state
-            handleError('Unexpected processing state');
+            return;
         }
+
+        if (data.has_more) {
+            // Respect API rate limits (server call itself may take > 1 second)
+            setTimeout(processNextOrder, 200);
+            return;
+        }
+
+            handleError('Unexpected processing state');
     }
 
     /**
@@ -101,7 +127,7 @@ jQuery(document).ready(function($) {
                             <div class="wcospa-progress-bar">
                                 <div class="wcospa-progress-fill" style="width: 0%"></div>
                             </div>
-                            <div class="wcospa-progress-text">0 / 0 orders processed</div>
+                            <div class="wcospa-progress-text">0 / ${totalEligible} orders processed</div>
                         </div>
                         <div class="wcospa-results-container">
                             <h4>Processing Results:</h4>
