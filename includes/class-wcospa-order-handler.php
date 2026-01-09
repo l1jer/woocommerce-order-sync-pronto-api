@@ -1414,11 +1414,11 @@ class WCOSPA_Bulk_Shipment_Handler
         }
 
         $after_order_id = isset($_POST['after_order_id']) ? (int) $_POST['after_order_id'] : 0;
-
+        
         WCOSPA_Logger::debug(
             sprintf('Bulk shipment request received (after_order_id: %d)', $after_order_id)
         );
-
+        
         $next_order = self::get_next_eligible_order($after_order_id);
 
         if (!$next_order) {
@@ -1430,68 +1430,68 @@ class WCOSPA_Bulk_Shipment_Handler
 
         $order_id = (int) $next_order->order_id;
         $pronto_order_number = (string) $next_order->pronto_order_number;
-
-        $order_start_time = microtime(true);
-        $result = WCOSPA_Shipment_Handler::fetch_shipment_number($order_id, 'bulk');
-        $processing_time = round((microtime(true) - $order_start_time) * 1000, 2); // milliseconds
-
-        // Handle timeout errors specifically
-        $status = 'error';
-        $message = $result['message'] ?? 'Processed successfully';
-
+            
+            $order_start_time = microtime(true);
+            $result = WCOSPA_Shipment_Handler::fetch_shipment_number($order_id, 'bulk');
+            $processing_time = round((microtime(true) - $order_start_time) * 1000, 2); // milliseconds
+            
+            // Handle timeout errors specifically
+            $status = 'error';
+            $message = $result['message'] ?? 'Processed successfully';
+            
         if (!empty($result['success'])) {
-            $status = 'success';
-        } elseif (isset($result['error_type'])) {
-            if ($result['error_type'] === 'timeout') {
-                $status = 'timeout';
-                $message = 'Request timed out (524 error)';
-
-                WCOSPA_Logger::log_order_error(
-                    $order_id,
+                $status = 'success';
+            } elseif (isset($result['error_type'])) {
+                if ($result['error_type'] === 'timeout') {
+                    $status = 'timeout';
+                    $message = 'Request timed out (524 error)';
+                    
+                     WCOSPA_Logger::log_order_error(
+                         $order_id,
                     sprintf(
                         'Bulk shipment fetch timed out: %s (%.2fms)',
-                        $result['message'],
-                        $processing_time
-                    )
-                );
-            } elseif ($result['error_type'] === 'server_error') {
-                $status = 'server_error';
-                $message = 'Server error occurred';
-
-                WCOSPA_Logger::log_order_error(
-                    $order_id,
+                             $result['message'],
+                             $processing_time
+                         )
+                     );
+                } elseif ($result['error_type'] === 'server_error') {
+                    $status = 'server_error';
+                    $message = 'Server error occurred';
+                    
+                     WCOSPA_Logger::log_order_error(
+                         $order_id,
                     sprintf(
                         'Bulk shipment fetch server error: %s (%.2fms)',
-                        $result['message'],
-                        $processing_time
-                    )
-                );
+                             $result['message'],
+                             $processing_time
+                         )
+                     );
+                }
             }
-        }
-
+            
         $response_result = [
-            'order_id' => $order_id,
-            'pronto_order_number' => $pronto_order_number,
-            'status' => $status,
-            'shipment_number' => $result['shipment_number'] ?? null,
-            'message' => $message,
-            'processing_time' => $processing_time,
-            'status_code' => $result['status_code'] ?? null,
-            'error_type' => $result['error_type'] ?? null,
-            'error_code' => $result['error_code'] ?? null
-        ];
+                'order_id' => $order_id,
+                'pronto_order_number' => $pronto_order_number,
+                'status' => $status,
+                'shipment_number' => $result['shipment_number'] ?? null,
+                'message' => $message,
+                'processing_time' => $processing_time,
+                'status_code' => $result['status_code'] ?? null,
+                'error_type' => $result['error_type'] ?? null,
+                'error_code' => $result['error_code'] ?? null
+            ];
 
-        WCOSPA_Logger::info(
+            WCOSPA_Logger::info(
             sprintf(
                 'Bulk shipment processing: %s - %s (%.2fms)',
-                strtoupper($status),
-                $message,
-                $processing_time
-            ),
-            [],
-            $order_id
-        );
-
+                    strtoupper($status),
+                    $message,
+                    $processing_time
+                ),
+                [],
+                $order_id
+            );
+            
         $has_more = self::has_next_eligible_order($order_id);
 
         wp_send_json_success([

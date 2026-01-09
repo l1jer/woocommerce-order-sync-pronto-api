@@ -126,6 +126,10 @@ This plugin is licensed under the GPLv2 or later. For more information, see http
 
 ### Changelog
 
+#### 1.6.10d
+- **Capacity Increase:** Increased scheduled shipment processing batch size
+  - Increased `process_pending_shipments()` batch size from 10 to 30 orders per scheduled run
+
 #### 1.6.10c
 - **Reliability Fix:** Bulk "Obtain Shipping Number" no longer skips eligible orders
   - Switched bulk shipment processing to sequential processing (one order per request) with stable "next eligible order" selection

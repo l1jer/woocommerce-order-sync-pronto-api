@@ -272,7 +272,7 @@ class WCOSPA_Shipment_Handler
             )
             ORDER BY CAST(COALESCE(pm2.meta_value, '0') AS UNSIGNED) ASC
             LIMIT %d
-        ", 10);
+        ", 30);
 
         $results = $wpdb->get_results($query);
 
