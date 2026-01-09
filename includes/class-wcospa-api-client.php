@@ -12,6 +12,34 @@ declare(strict_types=1);
 class WCOSPA_API_Client
 {
     /**
+     * Sanitise a payload before sending it to an external API.
+     *
+     * @param mixed $data Payload data.
+     * @param bool $changed Set to true if any string was modified.
+     * @return mixed Sanitised payload.
+     */
+    private static function sanitise_payload_for_api($data, bool &$changed = false)
+    {
+        if (is_string($data)) {
+            $sanitised = WCOSPA_Utils::sanitise_text_for_api($data);
+            if ($sanitised !== $data) {
+                $changed = true;
+            }
+            return $sanitised;
+        }
+
+        if (is_array($data)) {
+            $out = [];
+            foreach ($data as $key => $value) {
+                $out[$key] = self::sanitise_payload_for_api($value, $changed);
+            }
+            return $out;
+        }
+
+        return $data;
+    }
+
+    /**
      * Submit order information and retrieve the transaction UUID
      *
      * @param int $order_id WooCommerce order ID
@@ -42,9 +70,33 @@ class WCOSPA_API_Client
             // Prepare order data with the second argument (customer_reference)
             $order_data = WCOSPA_Order_Data_Formatter::format_order($order, $customer_reference);
 
+            // Sanitise order payload to avoid upstream API failures caused by emoji / invalid UTF-8.
+            $payload_changed = false;
+            $order_data_sanitised = self::sanitise_payload_for_api($order_data, $payload_changed);
+            if ($payload_changed) {
+                WCOSPA_Logger::warning(
+                    'Order payload contained unsupported characters (e.g., emoji). Sanitised before sync.',
+                    [],
+                    $order_id
+                );
+            }
+
             // Log the sync URL and order data for debugging
             WCOSPA_Logger::debug(sprintf('Sync URL: %s', $api_url));
-            WCOSPA_Logger::debug(sprintf('Order Data: %s', wp_json_encode($order_data)));
+            WCOSPA_Logger::debug(sprintf('Order Data: %s', wp_json_encode($order_data_sanitised)));
+
+            $order_json = function_exists('wp_json_encode')
+                ? wp_json_encode($order_data_sanitised)
+                : json_encode($order_data_sanitised);
+
+            if ($order_json === false) {
+                WCOSPA_Logger::error(
+                    sprintf('Failed to JSON encode order payload for order %d: %s', $order_id, json_last_error_msg()),
+                    [],
+                    $order_id
+                );
+                return new WP_Error('json_encode_error', 'Failed to encode order payload for API request.');
+            }
 
             // Make the POST request to the API to sync the order with timeout handling
             $response = wp_remote_post($api_url, [
@@ -54,7 +106,7 @@ class WCOSPA_API_Client
                     ),
                     'Content-Type' => 'application/json',
                 ],
-                'body' => function_exists('wp_json_encode') ? wp_json_encode($order_data) : json_encode($order_data),
+                'body' => $order_json,
                 'timeout' => 110, // Set to 110 seconds to avoid SiteGround 120s limit
             ]);
 

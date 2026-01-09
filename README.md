@@ -126,6 +126,11 @@ This plugin is licensed under the GPLv2 or later. For more information, see http
 
 ### Changelog
 
+#### 1.6.10e
+- **Compatibility Fix:** Prevent Pronto sync failures caused by emoji / invalid UTF-8 in customer-provided text
+  - Sanitises all string fields in the outgoing Pronto order payload before JSON encoding (removes non-BMP characters such as emoji, strips invalid UTF-8/control characters)
+  - Logs a warning on the order when sanitisation occurs, while preserving the rest of the content
+
 #### 1.6.10d
 - **Capacity Increase:** Increased scheduled shipment processing batch size
   - Increased `process_pending_shipments()` batch size from 10 to 30 orders per scheduled run
