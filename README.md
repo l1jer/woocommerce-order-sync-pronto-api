@@ -142,6 +142,27 @@ This plugin is licensed under the GPLv2 or later. For more information, see http
 
 ### Changelog
 
+#### 1.6.12
+- **Feature:** Implemented GitHub-based automatic update notification system
+  - Added `WCOSPA_Updater` class (`includes/class-wcospa-updater.php`) that integrates with WordPress's native plugin update UI — no third-party plugin required
+  - Checks GitHub Releases API every 12 hours (cached via transient) and compares the latest release tag against the installed version
+  - When a newer version is available, injects a standard WordPress update record so the Plugins screen displays the familiar "Update available" notice and "View version details" thickbox link
+  - Administrators can update directly from the WordPress Plugins screen; WordPress downloads the release ZIP from GitHub and replaces plugin files automatically
+  - Optional `WCOSPA_GITHUB_TOKEN` constant (defined in `wp-config.php`) supports private repositories and raises GitHub API rate limit from 60 to 5,000 requests per hour
+  - Optional `WCOSPA_GITHUB_REPO` constant overrides the default repository slug
+  - Release cache is cleared automatically after a successful update
+  - All check results (new version found, up to date, API errors) are written to the plugin log
+
+#### 1.6.11
+- **Refactor:** Simplified per-order log file structure from nested subdirectories to flat files
+  - Order log files are now written directly to `logs/order-{order_id}.log` instead of `logs/orders/{subdir}/order-{order_id}.log`
+  - Removed subdirectory grouping logic (`sprintf('%04d', $order_id % 100)`) and associated `wp_mkdir_p()` calls in `flush_order_buffer()`
+  - Updated `cleanup_old_logs()` to scan `order-*.log*` in the flat logs directory instead of recursively traversing subdirectories
+  - Updated `get_log_stats()` to use flat globs; `order_directories` stat is always 0 and retained for backward compatibility
+  - Updated `get_logged_orders()` to use a flat `glob($logs_dir . '/order-*.log')` instead of `glob($orders_dir . '/**/order-*.log', GLOB_NOSORT)`
+  - Updated admin Sync Status page log path display to reflect the new flat structure
+  - Reduces filesystem operations, eliminates empty directory cleanup, and makes order log files easier to locate and manage
+
 #### 1.6.10f
 - **Configuration Update:** Added support for three new Pulsar websites
   - Added debtor code mapping for pulsaroutdoors.com.au (211035)

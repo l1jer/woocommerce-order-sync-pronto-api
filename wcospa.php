@@ -2,7 +2,7 @@
 /**
  * Plugin Name: WooCommerce Order Sync Pronto API
  * Description: A comprehensive WooCommerce integration with Pronto API that handles order synchronization, shipment tracking, and status management. Features include automatic order syncing upon processing, manual sync capability, Pronto order number retrieval, shipment tracking integration with Advanced Shipment Tracking, custom order statuses, detailed sync logging, and admin interface enhancements. The plugin ensures reliable data synchronization with retry mechanisms and timeout alerts. Includes a dedicated sync status page, order column enhancements, and robust error handling.
- * Version: 1.6.10f
+ * Version: 1.6.12
  * Author: Jerry Li
  * Text Domain: wcospa
  * Requires at least: 5.0
@@ -26,7 +26,7 @@ add_action('plugins_loaded', function() {
         define('WCOSPA_URL', plugin_dir_url(__FILE__));
     }
     if (!defined('WCOSPA_VERSION')) {
-        define('WCOSPA_VERSION', '1.6.10f');
+        define('WCOSPA_VERSION', '1.6.12');
     }
 });
 
@@ -54,6 +54,7 @@ function wcospa_init() {
     require_once WCOSPA_PATH . 'includes/class-wcospa-api-client.php';
     require_once WCOSPA_PATH . 'includes/class-wcospa-admin-sync-status.php';
     require_once WCOSPA_PATH . 'includes/class-wcospa-shipment-handler.php';
+    require_once WCOSPA_PATH . 'includes/class-wcospa-updater.php';
     require_once WCOSPA_PATH . 'includes/wcospa-credentials.php';
 
     // Initialize plugin components
@@ -63,6 +64,7 @@ function wcospa_init() {
     WCOSPA_Admin_Sync_Status::init();
     WCOSPA_Admin_Orders_Column::init();
     WCOSPA_Shipment_Handler::init();
+    WCOSPA_Updater::init();
 
     // Add queue processing to admin-ajax.php
     add_action('admin_init', function() {
@@ -101,7 +103,7 @@ function wcospa_activate() {
         define('WCOSPA_URL', plugin_dir_url(__FILE__));
     }
     if (!defined('WCOSPA_VERSION')) {
-        define('WCOSPA_VERSION', '1.6.10f');
+        define('WCOSPA_VERSION', '1.6.12');
     }
 
     // Initialize components that need activation
@@ -129,7 +131,7 @@ function wcospa_deactivate() {
         define('WCOSPA_URL', plugin_dir_url(__FILE__));
     }
     if (!defined('WCOSPA_VERSION')) {
-        define('WCOSPA_VERSION', '1.6.10f');
+        define('WCOSPA_VERSION', '1.6.12');
     }
 
     // Include required files for deactivation

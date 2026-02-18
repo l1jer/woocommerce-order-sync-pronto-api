@@ -7,13 +7,16 @@ declare(strict_types=1);
  * 
  * Provides efficient logging functionality with minimal CPU and memory usage.
  * Features:
- * - Dedicated log files in plugin directory
- * - Automatic log rotation (7-day retention)
+ * - Dedicated log files in plugin directory (logs/)
+ * - General daily log: logs/wcospa-YYYY-MM-DD.log
+ * - Per-order log: logs/order-{order_id}.log (flat, no subdirectories)
+ * - Automatic log rotation when files exceed 10 MB
+ * - 14-day log retention with scheduled daily cleanup
  * - Performance optimizations (buffering, minimal file operations)
- * - Security features (file protection, input sanitization)
+ * - Security features (.htaccess protection, input sanitisation)
  * 
  * @package WCOSPA
- * @version 1.6.5
+ * @version 1.6.11
  */
 class WCOSPA_Logger
 {
@@ -237,7 +240,8 @@ class WCOSPA_Logger
     }
 
     /**
-     * Flush an order-specific log buffer to file
+     * Flush an order-specific log buffer to file.
+     * Writes directly to logs/order-{order_id}.log (no subdirectories).
      */
     private static function flush_order_buffer(int $order_id)
     {
@@ -246,32 +250,23 @@ class WCOSPA_Logger
         }
 
         $log_file = self::get_order_log_file_path($order_id);
-        $logs_dir = dirname($log_file);
 
-        // Ensure logs directory exists
+        // Ensure the top-level logs directory exists
+        $logs_dir = self::get_logs_directory();
         if (!is_dir($logs_dir)) {
             self::ensure_logs_directory();
         }
 
-        // Create order-specific subdirectory if it doesn't exist
-        $order_dir = dirname($log_file);
-        if (!is_dir($order_dir)) {
-            wp_mkdir_p($order_dir);
-        }
-
-        // Check if log file is too large before writing
+        // Rotate if the order log file has grown too large
         if (file_exists($log_file) && filesize($log_file) > self::MAX_LOG_SIZE) {
             self::rotate_log_file($log_file);
         }
 
-        // Write buffer contents to file
         $buffer_content = implode('', self::$order_log_buffers[$order_id]);
 
-        // Use file_put_contents with LOCK_EX for atomic writes
         $result = file_put_contents($log_file, $buffer_content, FILE_APPEND | LOCK_EX);
 
         if ($result !== false) {
-            // Clear buffer only if write was successful
             self::$order_log_buffers[$order_id] = [];
         }
     }
@@ -308,14 +303,12 @@ class WCOSPA_Logger
     }
 
     /**
-     * Get the order-specific log file path
+     * Get the order-specific log file path.
+     * All order logs live flat in the logs/ directory: logs/order-{order_id}.log
      */
     private static function get_order_log_file_path(int $order_id): string
     {
-        $logs_dir = self::get_logs_directory();
-        $order_subdir = sprintf('%04d', $order_id % 100); // Group orders into subdirectories (0000-0099, 0100-0199, etc.)
-        $order_dir = $logs_dir . "/orders/{$order_subdir}";
-        return $order_dir . "/order-{$order_id}.log";
+        return self::get_logs_directory() . "/order-{$order_id}.log";
     }
 
     /**
@@ -400,7 +393,8 @@ class WCOSPA_Logger
     }
 
     /**
-     * Clean up old log files
+     * Clean up log files older than RETENTION_DAYS days.
+     * Covers both daily general logs (wcospa-*.log*) and flat order logs (order-*.log*).
      */
     public static function cleanup_old_logs()
     {
@@ -412,89 +406,63 @@ class WCOSPA_Logger
 
         $cutoff_time = time() - (self::RETENTION_DAYS * 24 * 60 * 60);
 
-        // Clean up general log files
-        $files = glob($logs_dir . '/wcospa-*.log*');
-        foreach ($files as $file) {
-            if (filemtime($file) < $cutoff_time) {
+        // General daily logs: wcospa-YYYY-MM-DD.log
+        $general_files = glob($logs_dir . '/wcospa-*.log*') ?: [];
+        foreach ($general_files as $file) {
+            if (is_file($file) && filemtime($file) < $cutoff_time) {
                 unlink($file);
             }
         }
 
-        // Clean up order-specific log files
-        $orders_dir = $logs_dir . '/orders';
-        if (is_dir($orders_dir)) {
-            $order_dirs = glob($orders_dir . '/*', GLOB_ONLYDIR);
-            foreach ($order_dirs as $order_dir) {
-                $order_files = glob($order_dir . '/order-*.log*');
-                foreach ($order_files as $order_file) {
-                    if (filemtime($order_file) < $cutoff_time) {
-                        unlink($order_file);
-                    }
-                }
-                // Remove empty order directories
-                if (count(glob($order_dir . '/*')) === 0) {
-                    rmdir($order_dir);
-                }
+        // Flat per-order logs: order-{id}.log (and any rotated variants)
+        $order_files = glob($logs_dir . '/order-*.log*') ?: [];
+        foreach ($order_files as $file) {
+            if (is_file($file) && filemtime($file) < $cutoff_time) {
+                unlink($file);
             }
         }
     }
 
     /**
-     * Get log file statistics for admin display
+     * Get log file statistics for admin display.
+     * General logs: wcospa-*.log* | Order logs: order-*.log* (flat, no subdirectories)
      */
     public static function get_log_stats(): array
     {
         $logs_dir = self::get_logs_directory();
         $stats = [
-            'total_files' => 0,
-            'total_size' => 0,
-            'oldest_log' => null,
-            'newest_log' => null,
-            'general_files' => 0,
-            'order_files' => 0,
-            'order_directories' => 0
+            'total_files'      => 0,
+            'total_size'       => 0,
+            'oldest_log'       => null,
+            'newest_log'       => null,
+            'general_files'    => 0,
+            'order_files'      => 0,
+            'order_directories' => 0, // Always 0 — structure is now flat
         ];
 
         if (!is_dir($logs_dir)) {
             return $stats;
         }
 
-        // Count general log files
-        $general_files = glob($logs_dir . '/wcospa-*.log*');
+        $general_files = glob($logs_dir . '/wcospa-*.log*') ?: [];
+        $order_files   = glob($logs_dir . '/order-*.log*') ?: [];
+
         $stats['general_files'] = count($general_files);
+        $stats['order_files']   = count($order_files);
+        $stats['total_files']   = $stats['general_files'] + $stats['order_files'];
 
-        // Count order-specific files
-        $orders_dir = $logs_dir . '/orders';
-        if (is_dir($orders_dir)) {
-            $order_dirs = glob($orders_dir . '/*', GLOB_ONLYDIR);
-            $stats['order_directories'] = count($order_dirs);
-
-            foreach ($order_dirs as $order_dir) {
-                $order_files = glob($order_dir . '/order-*.log*');
-                $stats['order_files'] += count($order_files);
+        foreach (array_merge($general_files, $order_files) as $file) {
+            if (!is_file($file)) {
+                continue;
             }
-        }
+            $stats['total_size'] += filesize($file);
+            $mtime = filemtime($file);
 
-        $stats['total_files'] = $stats['general_files'] + $stats['order_files'];
-
-        // Calculate total size and timestamps
-        $all_files = array_merge($general_files, []);
-        if (is_dir($orders_dir)) {
-            $all_files = array_merge($all_files, glob($orders_dir . '/**/*', GLOB_NOSORT));
-        }
-
-        foreach ($all_files as $file) {
-            if (is_file($file)) {
-                $stats['total_size'] += filesize($file);
-                $mtime = filemtime($file);
-
-                if ($stats['oldest_log'] === null || $mtime < $stats['oldest_log']) {
-                    $stats['oldest_log'] = $mtime;
-                }
-
-                if ($stats['newest_log'] === null || $mtime > $stats['newest_log']) {
-                    $stats['newest_log'] = $mtime;
-                }
+            if ($stats['oldest_log'] === null || $mtime < $stats['oldest_log']) {
+                $stats['oldest_log'] = $mtime;
+            }
+            if ($stats['newest_log'] === null || $mtime > $stats['newest_log']) {
+                $stats['newest_log'] = $mtime;
             }
         }
 
@@ -544,35 +512,39 @@ class WCOSPA_Logger
     }
 
     /**
-     * Get all orders that have log files
+     * Get all orders that have log files.
+     * Scans flat order-*.log files directly in the logs/ directory.
      */
     public static function get_logged_orders(int $limit = 1000): array
     {
         $logs_dir = self::get_logs_directory();
-        $orders_dir = $logs_dir . '/orders';
 
-        if (!is_dir($orders_dir)) {
+        if (!is_dir($logs_dir)) {
             return [];
         }
 
-        $order_files = glob($orders_dir . '/**/order-*.log', GLOB_NOSORT);
+        $order_files = glob($logs_dir . '/order-*.log') ?: [];
         $orders = [];
 
         foreach ($order_files as $file) {
+            if (!is_file($file)) {
+                continue;
+            }
             if (preg_match('/order-(\d+)\.log$/', $file, $matches)) {
                 $order_id = (int) $matches[1];
+                $line_count = count(file($file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) ?: []);
                 $orders[$order_id] = [
-                    'order_id' => $order_id,
-                    'file_path' => $file,
-                    'file_size' => filesize($file),
+                    'order_id'      => $order_id,
+                    'file_path'     => $file,
+                    'file_size'     => filesize($file),
                     'last_modified' => filemtime($file),
-                    'log_count' => count(file($file))
+                    'log_count'     => $line_count,
                 ];
             }
         }
 
         // Sort by most recently modified first
-        uasort($orders, function($a, $b) {
+        uasort($orders, static function (array $a, array $b): int {
             return $b['last_modified'] <=> $a['last_modified'];
         });
 

@@ -133,7 +133,8 @@ class WCOSPA_Admin_Sync_Status
                         <li><?php _e('Total size:', 'wcospa'); ?> <?php echo esc_html(size_format($log_stats['total_size'])); ?></li>
                         <li><?php _e('Retention period:', 'wcospa'); ?> 14 days</li>
                         <li><?php _e('Log location:', 'wcospa'); ?> <code>plugins/woocommerce-order-sync-pronto-api/logs/</code></li>
-                        <li><?php _e('Order logs path:', 'wcospa'); ?> <code>plugins/woocommerce-order-sync-pronto-api/logs/orders/XXXX/order-XXXX.log</code></li>
+                        <li><?php _e('General log:', 'wcospa'); ?> <code>logs/wcospa-YYYY-MM-DD.log</code></li>
+                        <li><?php _e('Order logs:', 'wcospa'); ?> <code>logs/order-{order_id}.log</code> (<?php _e('flat — no subdirectories', 'wcospa'); ?>)</li>
                     </ul>
                 </div>
             </div>
