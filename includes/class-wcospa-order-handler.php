@@ -937,6 +937,12 @@ class WCOSPA_Order_Data_Formatter
             return '211023';
         } elseif (strpos($site_url, 'skywatcheraustralia.com.au') !== false) {
             return '211026';
+        } elseif (strpos($site_url, 'pulsaroutdoors.com.au') !== false) {
+            return '211035';
+        } elseif (strpos($site_url, 'pulsarvision.com.au') !== false) {
+            return '211036';
+        } elseif (strpos($site_url, 'pulsarwildlife.com.au') !== false) {
+            return '211037';
         }
         
         // Default for all other sites

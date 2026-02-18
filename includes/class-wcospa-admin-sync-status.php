@@ -81,6 +81,16 @@ class WCOSPA_Admin_Sync_Status
                 <div class="wcospa-input-section">
                     <p><?php _e('Current Debtor Code:', 'wcospa'); ?> <strong id="current-debtor-code"><?php echo esc_html($debtor_code); ?></strong></p>
                     <p><?php _e('Default Value:', 'wcospa'); ?> <code><?php echo esc_html(WCOSPA_Order_Data_Formatter::DEFAULT_DEBTOR_CODE); ?></code></p>
+                    <p><?php _e('Site-Specific Debtor Codes:', 'wcospa'); ?></p>
+                    <ul>
+                        <li>zerotech.com.au / store.zerotechoptics.com: <code>210942</code></li>
+                        <li>zerotechoutdoors.com.au: <code>211027</code></li>
+                        <li>nitecoreaustralia.com.au: <code>211023</code></li>
+                        <li>skywatcheraustralia.com.au: <code>211026</code></li>
+                        <li>pulsaroutdoors.com.au: <code>211035</code></li>
+                        <li>pulsarvision.com.au: <code>211036</code></li>
+                        <li>pulsarwildlife.com.au: <code>211037</code></li>
+                    </ul>
                     <label for="wcospa-debtor-code"><?php _e('Custom Debtor Code:', 'wcospa'); ?></label>
                     <input type="text" id="wcospa-debtor-code" value="<?php echo esc_attr($debtor_code); ?>" class="regular-text">
                     <button id="wcospa-update-debtor-code" class="button" data-nonce="<?php echo wp_create_nonce('wcospa_update_debtor_code_nonce'); ?>">

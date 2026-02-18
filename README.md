@@ -61,6 +61,22 @@ The plugin utilises these meta fields for order tracking:
 - `_wcospa_pronto_order_number`: Pronto order reference
 - `_wcospa_shipment_number`: Shipping tracking number
 
+#### Debtor Code Configuration
+
+The plugin automatically assigns the correct Pronto debtor code based on the site domain:
+
+| Site Domain | Debtor Code |
+|---|---|
+| zerotech.com.au / store.zerotechoptics.com | 210942 (default) |
+| zerotechoutdoors.com.au | 211027 |
+| nitecoreaustralia.com.au | 211023 |
+| skywatcheraustralia.com.au | 211026 |
+| pulsaroutdoors.com.au | 211035 |
+| pulsarvision.com.au | 211036 |
+| pulsarwildlife.com.au | 211037 |
+
+Debtor codes can be manually overridden via WooCommerce > Sync Status admin page.
+
 #### Shipment Tracking
 
 Advanced Shipment Tracking integration:
@@ -125,6 +141,14 @@ The plugin introduces a custom order status:
 This plugin is licensed under the GPLv2 or later. For more information, see https://www.gnu.org/licenses/gpl-2.0.html.
 
 ### Changelog
+
+#### 1.6.10f
+- **Configuration Update:** Added support for three new Pulsar websites
+  - Added debtor code mapping for pulsaroutdoors.com.au (211035)
+  - Added debtor code mapping for pulsarvision.com.au (211036)
+  - Added debtor code mapping for pulsarwildlife.com.au (211037)
+  - Updated admin interface to display all site-specific debtor code mappings
+  - Updated documentation with complete debtor code configuration table
 
 #### 1.6.10e
 - **Compatibility Fix:** Prevent Pronto sync failures caused by emoji / invalid UTF-8 in customer-provided text
