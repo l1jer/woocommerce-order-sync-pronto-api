@@ -1101,6 +1101,7 @@ class WCOSPA_Order_Data_Formatter
             'stripe_cc' => 'CC', // Stripe Credit Card
             'stripe_zip' => 'CC', // ZIP (Stripe)
             'stripe_applepay' => 'CC', // Apple Pay (Stripe)
+            'stripe_afterpay' => 'CC', // AfterPay (Stripe)
         ];
 
         // Check if the payment method exists in the mapping
