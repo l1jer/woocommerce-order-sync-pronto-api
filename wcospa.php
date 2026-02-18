@@ -77,6 +77,9 @@ add_action('plugins_loaded', 'wcospa_init');
 
 /**
  * Activation hook
+ *
+ * Runs before plugins_loaded, so WCOSPA_PATH is not yet defined via that hook.
+ * We define all required constants inline here before calling any class methods.
  */
 register_activation_hook(__FILE__, 'wcospa_activate');
 function wcospa_activate() {
@@ -89,12 +92,23 @@ function wcospa_activate() {
             ['back_link' => true]
         );
     }
-    
+
+    // Define constants early — plugins_loaded has not fired yet during activation
+    if (!defined('WCOSPA_PATH')) {
+        define('WCOSPA_PATH', plugin_dir_path(__FILE__));
+    }
+    if (!defined('WCOSPA_URL')) {
+        define('WCOSPA_URL', plugin_dir_url(__FILE__));
+    }
+    if (!defined('WCOSPA_VERSION')) {
+        define('WCOSPA_VERSION', '1.6.10f');
+    }
+
     // Initialize components that need activation
-    require_once plugin_dir_path(__FILE__) . 'includes/class-wcospa-logger.php';
-    require_once plugin_dir_path(__FILE__) . 'includes/class-wcospa-order-handler.php';
-    require_once plugin_dir_path(__FILE__) . 'includes/class-wcospa-shipment-handler.php';
-    
+    require_once WCOSPA_PATH . 'includes/class-wcospa-logger.php';
+    require_once WCOSPA_PATH . 'includes/class-wcospa-order-handler.php';
+    require_once WCOSPA_PATH . 'includes/class-wcospa-shipment-handler.php';
+
     WCOSPA_Logger::init();
     WCOSPA_Order_Handler::activate();
     WCOSPA_Shipment_Handler::activate();
@@ -102,14 +116,27 @@ function wcospa_activate() {
 
 /**
  * Deactivation hook
+ *
+ * Also runs outside of plugins_loaded, so ensure constants are defined here too.
  */
 register_deactivation_hook(__FILE__, 'wcospa_deactivate');
 function wcospa_deactivate() {
+    // Define constants early — plugins_loaded may not have fired yet during deactivation
+    if (!defined('WCOSPA_PATH')) {
+        define('WCOSPA_PATH', plugin_dir_path(__FILE__));
+    }
+    if (!defined('WCOSPA_URL')) {
+        define('WCOSPA_URL', plugin_dir_url(__FILE__));
+    }
+    if (!defined('WCOSPA_VERSION')) {
+        define('WCOSPA_VERSION', '1.6.10f');
+    }
+
     // Include required files for deactivation
-    require_once plugin_dir_path(__FILE__) . 'includes/class-wcospa-logger.php';
-    require_once plugin_dir_path(__FILE__) . 'includes/class-wcospa-order-handler.php';
-    require_once plugin_dir_path(__FILE__) . 'includes/class-wcospa-shipment-handler.php';
-    
+    require_once WCOSPA_PATH . 'includes/class-wcospa-logger.php';
+    require_once WCOSPA_PATH . 'includes/class-wcospa-order-handler.php';
+    require_once WCOSPA_PATH . 'includes/class-wcospa-shipment-handler.php';
+
     WCOSPA_Order_Handler::deactivate();
     WCOSPA_Shipment_Handler::deactivate();
 }
