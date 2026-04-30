@@ -112,6 +112,15 @@ This plugin is licensed under the GPLv2 or later. For more information, see http
 
 ### Changelog
 
+#### 2.0-INT-EUR.1-hotfix
+
+- **Critical Fix**: prevent unpaid orders from being POSTed to Pronto via the no-dealer direct-sync path. The sync that previously ran on `woocommerce_checkout_order_processed` (before payment confirmation) is now deferred to `woocommerce_order_status_processing`, which fires only after the payment gateway reports success. Resolves the duplicate Pronto POST incident on order #23668, where one unpaid PayPal order was sent to Pronto four times across PayPal retries.
+  - `WCOSPA_INT_Extension::check_international_order()`: for no-dealer countries, sets the `_wcospa_int_direct_sync` meta flag and adds an order note instead of immediately calling Pronto.
+  - `WCOSPA_INT_Extension::maybe_sync_no_dealer_order()` (new): runs on `woocommerce_order_status_processing`; sync proceeds only when `is_paid()` is true, no `_wcospa_transaction_uuid` or `_wcospa_pronto_order_number` is present, and a 60-second single-flight transient lock can be acquired.
+  - `WCOSPA_INT_Extension::handle_order_status_change()`: skips the dealer-notification path for orders flagged as no-dealer direct sync, preventing legitimate paid SE/no-dealer orders from being moved to `failed` by `handle_email_failure()`.
+- **Defensive Fix**: `WCOSPA_Shipment_Handler::add_tracking_to_order()` now refuses to auto-promote unpaid or `failed`/`cancelled`/`refunded` orders to `completed`. Tracking numbers received in those states are stored on `_wcospa_pending_tracking_review` for manual review and an `[WCOSPA] Refusing to auto-complete` warning is logged.
+- **Scope**: this is a targeted hotfix. The full backport of `main` 1.6.12a (logger, updater, bulk shipment improvements, AfterPay support, etc.) is tracked separately in `INT-EUR-backport-plan.md`.
+
 #### 2.0-INT
 
 - **Major Release**: First International Version with Dealer Network Integration

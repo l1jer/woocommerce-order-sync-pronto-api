@@ -100,6 +100,11 @@ class WCOSPA_INT_Extension {
 
         // Add early action to prevent Pronto sync
         add_action('woocommerce_checkout_order_processed', [$this, 'check_international_order'], 5, 1);
+
+        // Hotfix: defer no-dealer direct Pronto sync until payment is confirmed (status: processing).
+        // Prevents the failure mode seen in order #23668 where unpaid/failed orders were POSTed
+        // multiple times to Pronto from the woocommerce_checkout_order_processed hook.
+        add_action('woocommerce_order_status_processing', [$this, 'maybe_sync_no_dealer_order'], 10, 1);
     }
 
     /**
@@ -115,6 +120,18 @@ class WCOSPA_INT_Extension {
 
         // Only process orders transitioning to 'processing'
         if ($new_status !== 'processing' || $old_status === 'await-dealer') {
+            return;
+        }
+
+        // Hotfix: skip dealer notification for orders flagged as no-dealer direct sync.
+        // These orders are handled by maybe_sync_no_dealer_order() instead. Without this guard,
+        // send_dealer_notification() would fail (no dealer email), trigger handle_email_failure(),
+        // and incorrectly move legitimate paid SE orders to 'failed'.
+        if ($order->get_meta('_wcospa_int_direct_sync') === 'yes') {
+            $this->log_debug(sprintf(
+                'Order #%d is flagged for no-dealer direct sync; skipping dealer notification path',
+                $order_id
+            ));
             return;
         }
 
@@ -204,21 +221,87 @@ class WCOSPA_INT_Extension {
                 $dealers[$shipping_country]['name']
             ));
         } else {
-            // No dealer for this country - proceed directly to Pronto sync
+            // No dealer for this country - flag the order for direct Pronto sync once payment
+            // is confirmed. The actual sync runs in maybe_sync_no_dealer_order() on the
+            // woocommerce_order_status_processing hook. Doing the sync here on
+            // woocommerce_checkout_order_processed (which fires before the payment gateway
+            // returns) caused order #23668 to be POSTed to Pronto four times for an unpaid
+            // PayPal transaction.
             $this->log_debug(sprintf(
-                'Order #%d is for %s with no assigned dealer - proceeding directly to Pronto sync',
+                'Order #%d is for %s with no assigned dealer - flagged for direct Pronto sync after payment confirmation',
                 $order_id,
                 $shipping_country
             ));
-            
-            // Add order note
+
+            update_post_meta($order_id, '_wcospa_int_direct_sync', 'yes');
+
             $order->add_order_note(sprintf(
-                __('No dealer assigned for country %s. Order will be processed directly.', 'wcospa'),
+                __('No dealer assigned for country %s. Will sync to Pronto once payment is confirmed.', 'wcospa'),
                 $shipping_country
             ));
-            
-            // Trigger Pronto sync
+        }
+    }
+
+    /**
+     * Trigger the deferred direct Pronto sync for no-dealer international orders.
+     *
+     * Runs on woocommerce_order_status_processing, which fires only after the payment
+     * gateway reports success. Includes payment, idempotency, and single-flight checks
+     * so the sync cannot run for unpaid orders or duplicate against an existing transaction.
+     */
+    public function maybe_sync_no_dealer_order(int $order_id): void {
+        $order = wc_get_order($order_id);
+        if (!($order instanceof WC_Order)) {
+            return;
+        }
+
+        if ($order->get_meta('_wcospa_int_direct_sync') !== 'yes') {
+            return;
+        }
+
+        if (!$order->is_paid()) {
+            $this->log_debug(sprintf(
+                'Skipping direct sync for #%d - payment not confirmed (is_paid=false, status=%s)',
+                $order_id,
+                $order->get_status()
+            ));
+            return;
+        }
+
+        if (!empty($order->get_meta('_wcospa_transaction_uuid'))) {
+            $this->log_debug(sprintf(
+                'Skipping direct sync for #%d - already has _wcospa_transaction_uuid',
+                $order_id
+            ));
+            return;
+        }
+
+        if (!empty($order->get_meta('_wcospa_pronto_order_number'))) {
+            $this->log_debug(sprintf(
+                'Skipping direct sync for #%d - already has _wcospa_pronto_order_number',
+                $order_id
+            ));
+            return;
+        }
+
+        $lock_key = 'wcospa_int_sync_lock_' . $order_id;
+        if (get_transient($lock_key)) {
+            $this->log_debug(sprintf(
+                'Skipping direct sync for #%d - single-flight lock present (concurrent retry)',
+                $order_id
+            ));
+            return;
+        }
+        set_transient($lock_key, 1, 60);
+
+        try {
+            $this->log_debug(sprintf(
+                'Triggering deferred direct Pronto sync for paid no-dealer order #%d',
+                $order_id
+            ));
             WCOSPA_Order_Handler::handle_order_sync($order_id);
+        } finally {
+            delete_transient($lock_key);
         }
     }
 

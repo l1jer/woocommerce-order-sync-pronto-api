@@ -239,6 +239,23 @@ class WCOSPA_Shipment_Handler
             return false;
         }
 
+        // Hotfix defensive guard: refuse to auto-complete unpaid or already-failed/cancelled
+        // orders. This is a secondary line of defence against the upstream bug where unpaid
+        // orders were being POSTed to Pronto and Pronto then returned a tracking number.
+        // The tracking number is preserved on a meta key for manual review.
+        $blocked_statuses = ['failed', 'cancelled', 'refunded'];
+        if (!$order->is_paid() || in_array($order->get_status(), $blocked_statuses, true)) {
+            update_post_meta($order_id, '_wcospa_pending_tracking_review', $tracking_number);
+            error_log(sprintf(
+                '[WCOSPA] Refusing to auto-complete order %d in status %s with paid=%s; tracking %s saved to _wcospa_pending_tracking_review for manual review',
+                $order_id,
+                $order->get_status(),
+                $order->is_paid() ? 'true' : 'false',
+                $tracking_number
+            ));
+            return false;
+        }
+
         if (class_exists('WC_Advanced_Shipment_Tracking_Actions')) {
             $ast = WC_Advanced_Shipment_Tracking_Actions::get_instance();
             
