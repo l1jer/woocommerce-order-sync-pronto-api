@@ -114,6 +114,7 @@ This plugin is licensed under the GPLv2 or later. For more information, see http
 
 #### 2.0-INT-EUR.1-hotfix
 
+- **Change**: INT order line pricing now sends `price_ex_tax` at the same unit value as `price_inc_tax`; this branch no longer removes 10% GST from line prices before sending orders to Pronto.
 - **Critical Fix**: prevent unpaid orders from being POSTed to Pronto via the no-dealer direct-sync path. The sync that previously ran on `woocommerce_checkout_order_processed` (before payment confirmation) is now deferred to `woocommerce_order_status_processing`, which fires only after the payment gateway reports success. Resolves the duplicate Pronto POST incident on order #23668, where one unpaid PayPal order was sent to Pronto four times across PayPal retries.
   - `WCOSPA_INT_Extension::check_international_order()`: for no-dealer countries, sets the `_wcospa_int_direct_sync` meta flag and adds an order note instead of immediately calling Pronto.
   - `WCOSPA_INT_Extension::maybe_sync_no_dealer_order()` (new): runs on `woocommerce_order_status_processing`; sync proceeds only when `is_paid()` is true, no `_wcospa_transaction_uuid` or `_wcospa_pronto_order_number` is present, and a 60-second single-flight transient lock can be acquired.

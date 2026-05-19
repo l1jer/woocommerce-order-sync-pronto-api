@@ -770,9 +770,9 @@ class WCOSPA_Order_Data_Formatter
                 continue;
             }
 
-            // Calculate price_inc_tax per item (single unit price including tax)
+            // Calculate the unit price without removing tax for this INT site.
             $price_inc_tax_per_item = $item->get_total() / $item->get_quantity();
-            $price_ex_tax_per_item = $price_inc_tax_per_item / 1.1; // Calculate price excluding tax per unit
+            $price_ex_tax_per_item = $price_inc_tax_per_item;
 
             // Add the formatted item to the list
             $formatted_items[] = [
